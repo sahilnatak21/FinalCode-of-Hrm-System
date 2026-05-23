@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+python-multipart
+pdfplumber
+python-docx
+spacy
+# After installing spacy, run: python -m spacy download en_core_web_sm

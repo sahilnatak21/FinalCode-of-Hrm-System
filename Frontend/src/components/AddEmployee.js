@@ -2,7 +2,14 @@ import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createEmployee, createEmployees } from '../utils/api';
 import { parseCSV, downloadCSV } from '../utils/csvParser';
+import { formatSkillScores, parseSkillScores } from '../utils/skillScores';
 import { toast } from '../utils/toast';
+
+const createSkillEntry = (name = '', score = 5) => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  name,
+  score,
+});
 
 const AddEmployee = () => {
   const navigate = useNavigate();
@@ -19,7 +26,9 @@ const AddEmployee = () => {
     category: 'Full-time',
     availability: 'Available',
     performanceRating: 0,
+    skillScores: '',
   });
+  const [skillEntries, setSkillEntries] = useState([createSkillEntry()]);
 
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -43,6 +52,24 @@ const AddEmployee = () => {
     }));
   };
 
+  const updateSkillEntry = (id, field, value) => {
+    setSkillEntries((prev) =>
+      prev.map((entry) =>
+        entry.id === id
+          ? { ...entry, [field]: field === 'score' ? Math.min(10, Math.max(0, Number(value) || 0)) : value }
+          : entry
+      )
+    );
+  };
+
+  const addSkillEntry = () => {
+    setSkillEntries((prev) => [...prev, createSkillEntry()]);
+  };
+
+  const removeSkillEntry = (id) => {
+    setSkillEntries((prev) => (prev.length > 1 ? prev.filter((entry) => entry.id !== id) : prev));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -55,7 +82,18 @@ const AddEmployee = () => {
     }
 
     try {
-      await createEmployee(formData);
+      const structuredSkillScores = skillEntries.reduce((acc, entry) => {
+        const skillName = String(entry.name || '').trim();
+        if (!skillName) return acc;
+        acc[skillName] = Number(entry.score || 0);
+        return acc;
+      }, {});
+
+      await createEmployee({
+        ...formData,
+        skillScores: structuredSkillScores,
+        skills: formData.skills || Object.keys(structuredSkillScores).join(', '),
+      });
       toast.success('Employee added successfully');
       setShowSuccess(true);
       setSuccessMessage('Employee added successfully. Redirecting to employee list...');
@@ -70,7 +108,9 @@ const AddEmployee = () => {
         category: 'Full-time',
         availability: 'Available',
         performanceRating: 0,
+        skillScores: '',
       });
+      setSkillEntries([createSkillEntry()]);
 
       setTimeout(() => {
         setShowSuccess(false);
@@ -147,11 +187,36 @@ const AddEmployee = () => {
         <div className="user">Admin Portal</div>
       </header>
 
+      <section className="hero-strip">
+        <div className="hero-copy">
+          <span className="eyebrow">Employee Intake</span>
+          <h2>Add structured talent data manually or import from CSV.</h2>
+          <p>
+            Keep employee profiles consistent with the rest of the platform by capturing named skills,
+            ratings, experience, and availability in one standardized workflow.
+          </p>
+        </div>
+        <div className="hero-stats">
+          <div className="hero-stat">
+            <span>Input Modes</span>
+            <strong>Manual + CSV</strong>
+          </div>
+          <div className="hero-stat">
+            <span>Skill Scores</span>
+            <strong>0-10 scale</strong>
+          </div>
+          <div className="hero-stat">
+            <span>Status</span>
+            <strong>{loading ? 'Saving...' : 'Ready'}</strong>
+          </div>
+        </div>
+      </section>
+
       <section className="panel">
         <h2>Import Employee Data (CSV)</h2>
         <p>
-          Expected columns: Employee ID, Name, Skills, Skill Level, Experience (years), Category,
-          Availability, Performance Rating, Department, Role.
+          Expected columns: Employee ID, Name, Skills, Skill Scores, Skill Level, Experience
+          (years), Category, Availability, Performance Rating, Department, Role.
         </p>
         <div className="table-toolbar" style={{ padding: '12px 0 0', borderBottom: 'none' }}>
           <input
@@ -166,7 +231,7 @@ const AddEmployee = () => {
             className="btn"
             onClick={() => {
               const template =
-                'Employee ID,Name,Skills,Skill Level,Experience (years),Category,Availability,Performance Rating,Department,Role\nEMP001,John Doe,JavaScript React Node.js,8,5,Full-time,Available,8.5,Engineering,Software Engineer\nEMP002,Jane Smith,Python Django SQL,7,3,Full-time,Available,7.8,Engineering,Backend Developer';
+                'Employee ID,Name,Skills,Skill Scores,Skill Level,Experience (years),Category,Availability,Performance Rating,Department,Role\nEMP001,John Doe,"JavaScript,React,Node.js","JavaScript:8, React:9, Node.js:7",8,5,Full-time,Available,8.5,Engineering,Software Engineer\nEMP002,Jane Smith,"Python,Django,SQL","Python:9, Django:8, SQL:7",8,3,Full-time,Available,7.8,Engineering,Backend Developer';
               downloadCSV(template, 'employee_template.csv');
             }}
           >
@@ -185,6 +250,10 @@ const AddEmployee = () => {
 
       <form className="employee-form" onSubmit={handleSubmit}>
         <h2>Add Employee Manually</h2>
+        <div className="surface-note">
+          Use structured skill scores wherever possible. These values directly influence matching,
+          ranking, and team formation quality across the application.
+        </div>
 
         <label htmlFor="employeeId">Employee ID</label>
         <input
@@ -239,6 +308,41 @@ const AddEmployee = () => {
           onChange={handleChange}
           placeholder="Comma-separated skills"
         />
+        <p className="helper-text">Optional free-text summary. Structured scores below are used for matching.</p>
+
+        <div className="section-title-row compact">
+          <div>
+            <label>Skill Scores</label>
+            <p className="helper-text">Add named skills and a 0-10 score for each employee.</p>
+          </div>
+          <button type="button" className="btn btn-neutral" onClick={addSkillEntry}>
+            Add Skill
+          </button>
+        </div>
+
+        <div className="skill-entry-list">
+          {skillEntries.map((entry) => (
+            <div className="skill-entry-row" key={entry.id}>
+              <input
+                type="text"
+                value={entry.name}
+                onChange={(e) => updateSkillEntry(entry.id, 'name', e.target.value)}
+                placeholder="Skill name"
+              />
+              <input
+                type="number"
+                min="0"
+                max="10"
+                value={entry.score}
+                onChange={(e) => updateSkillEntry(entry.id, 'score', e.target.value)}
+                placeholder="Score"
+              />
+              <button type="button" className="btn btn-danger" onClick={() => removeSkillEntry(entry.id)}>
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
 
         <div className="form-row">
           <div>
@@ -306,6 +410,14 @@ const AddEmployee = () => {
           max="10"
           step="0.1"
         />
+        <p className="helper-text">
+          Structured Skill Scores Preview: {formatSkillScores(parseSkillScores(skillEntries.reduce((acc, entry) => {
+            if (String(entry.name || '').trim()) {
+              acc[entry.name] = entry.score;
+            }
+            return acc;
+          }, {}))) || 'No skill scores added yet'}
+        </p>
 
         <button type="submit" disabled={loading}>
           {loading ? (

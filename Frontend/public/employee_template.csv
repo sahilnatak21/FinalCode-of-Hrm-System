@@ -1,7 +1,4 @@
-Employee ID,Name,Skills,Skill Level,Experience (years),Category,Availability,Performance Rating,Department,Role
-EMP001,John Doe,JavaScript React Node.js,8,5,Full-time,Available,8.5,Engineering,Software Engineer
-EMP002,Jane Smith,Python Django SQL,7,3,Full-time,Available,7.8,Engineering,Backend Developer
-EMP003,Mike Johnson,Java Spring Hibernate,9,7,Full-time,Busy,9.2,Engineering,Senior Developer
-EMP004,Sarah Williams,UI/UX Design Figma,6,4,Full-time,Available,7.5,Design,UI Designer
-EMP005,David Brown,Sales CRM Negotiation,8,6,Full-time,Available,8.0,Sales,Sales Manager
+Employee ID,Name,Skills,Skill Scores,Skill Level,Experience (years),Category,Availability,Performance Rating,Department,Role
+EMP001,John Doe,"React,Node.js,SQL","React:8, Node.js:7, SQL:6",8,4,Full-time,Available,8.6,Engineering,Frontend Developer
+EMP002,Jane Smith,"Python,ML,Statistics","Python:9, ML:8, Statistics:9",9,5,Full-time,Available,9.1,Data,ML Engineer
 

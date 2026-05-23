@@ -124,3 +124,7 @@ src/
 
 This project is open source and available for personal and commercial use.
 
+
+resume service api runnig command
+" python -m uvicorn resume_api:APP --reload --port 5001"
+

@@ -1,0 +1,43 @@
+{
+  "projects": [
+    {
+      "projectId": "PRJ-2026-001",
+      "projectName": "Skill-Based Team Formation",
+      "requiredTeamSize": 5,
+      "minExperience": 2,
+      "maxBudget": 200000,
+      "deadlineDays": 30,
+      "scoreWeights": {
+        "skill_score": 0.5,
+        "experience": 0.25,
+        "performance": 0.25
+      },
+      "skillRequirements": [
+        {
+          "name": "Java",
+          "minScore": 5,
+          "maxScore": 10,
+          "priority": "critical"
+        },
+        {
+          "name": "CSS",
+          "minScore": 6,
+          "maxScore": 10,
+          "priority": "high"
+        },
+        {
+          "name": "Communication",
+          "minScore": 8,
+          "maxScore": 10,
+          "priority": "high"
+        },
+        {
+          "name": "MongoDB",
+          "minScore": 3,
+          "maxScore": 10,
+          "priority": "medium"
+        }
+      ]
+    }
+  ]
+}

@@ -26,22 +26,7 @@ public class MlModelController {
 
     @PostMapping("/team-formation")
     public ResponseEntity<JsonNode> generateTeam(@RequestBody Map<String, Object> payload) {
-        Map<String, Object> criteria = getMap(payload, "criteria");
-        Map<String, Object> config = getMap(payload, "config");
-
-        JsonNode result = mlModelService.generateTeam(criteria, config);
+        JsonNode result = mlModelService.generateTeam(payload);
         return ResponseEntity.ok(result);
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> getMap(Map<String, Object> payload, String key) {
-        if (payload == null) {
-            return Map.of();
-        }
-        Object value = payload.get(key);
-        if (value instanceof Map<?, ?> mapValue) {
-            return (Map<String, Object>) mapValue;
-        }
-        return Map.of();
     }
 }

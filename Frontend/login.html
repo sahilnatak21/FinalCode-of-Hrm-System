@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Login - AI Powered HR Management System">
+  <title>Login - HR Management System</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="auth-page">
+  <main class="auth-shell">
+    <section class="auth-card">
+      <div class="auth-copy">
+        <span class="auth-badge">Secure Access</span>
+        <h1>HR Management Login</h1>
+        <p>Sign in with the email/username and password stored in the database.</p>
+      </div>
+
+      <form id="loginForm" class="auth-form">
+        <div id="loginMessage" class="auth-message" style="display: none;"></div>
+
+        <label for="username">Email / Username</label>
+        <input id="username" name="username" type="text" placeholder="Enter email or username" required>
+
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" placeholder="Enter password" required>
+
+        <button id="loginBtn" type="submit">Login</button>
+      </form>
+    </section>
+  </main>
+
+  <script src="login.js"></script>
+</body>
+</html>

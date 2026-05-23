@@ -58,6 +58,31 @@ const Attendance = () => {
         <div className="user">Admin Portal</div>
       </header>
 
+      <section className="hero-strip">
+        <div className="hero-copy">
+          <span className="eyebrow">Availability Monitor</span>
+          <h2>Track who is ready for team allocation in real time.</h2>
+          <p>
+            Attendance status feeds operational visibility and helps identify which employees are
+            currently available before project teams are assembled.
+          </p>
+        </div>
+        <div className="hero-stats">
+          <div className="hero-stat">
+            <span>Total Employees</span>
+            <strong>{employees.length}</strong>
+          </div>
+          <div className="hero-stat">
+            <span>Filtered Records</span>
+            <strong>{filteredEmployees.length}</strong>
+          </div>
+          <div className="hero-stat">
+            <span>Current Search</span>
+            <strong>{searchTerm ? 'Active' : 'All'}</strong>
+          </div>
+        </div>
+      </section>
+
       <section className="cards">
         <div className="card green">
           <h3>Present</h3>

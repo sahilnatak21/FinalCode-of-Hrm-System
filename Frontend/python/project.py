@@ -16,6 +16,7 @@
 â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 """
 
+import json
 import pandas as pd
 import numpy as np
 import os
@@ -24,7 +25,16 @@ import warnings
 from datetime import datetime
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.cluster import KMeans
-from sklearn.metrics import silhouette_score, calinski_harabasz_score, davies_bouldin_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import (
+    accuracy_score,
+    calinski_harabasz_score,
+    classification_report,
+    confusion_matrix,
+    davies_bouldin_score,
+    silhouette_score
+)
+from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.gridspec import GridSpec
@@ -46,6 +56,14 @@ CONFIG = {
     'MULTI_SEED_SEARCH': [11, 23, 42, 67, 89],
     'ATTENTION_PROBE_K': 4,
     'OUTPUT_WIDTH': 85,
+    'PROJECT_INPUT_FILE': 'project_requirements.json',
+    'CLASSIFICATION_TARGET_COLUMNS': [
+        'Actual Team',
+        'Actual Label',
+        'Target',
+        'Class',
+        'Department'
+    ],
     'BASE_FEATURES': [
         'Skill Level',
         'Experience',
@@ -66,13 +84,40 @@ CONFIG = {
         'databases': 'database_design',
         'database': 'database_design',
         'ui_ux': 'ux_design',
-        'pm': 'project_management'
+        'pm': 'project_management',
+        'project management': 'project_management',
+        'problem solving': 'analytics',
+        'collaboration': 'communication',
+        'mongo': 'database_design',
+        'mongodb': 'database_design',
+        'css': 'frontend',
+        'html': 'frontend',
+        'java': 'backend'
+    },
+    'PRIORITY_LEVELS': {
+        'critical': 1.0,
+        'high': 0.8,
+        'medium': 0.6,
+        'low': 0.4
     },
     'AVAILABILITY_MAP': {
         'available': 1.0,
         'busy': 0.6,
         'on leave': 0.2,
         'unavailable': 0.0
+    },
+    'PROJECT_SCORING_WEIGHTS': {
+        'skill_similarity': 0.38,
+        'experience_fit': 0.18,
+        'performance': 0.14,
+        'availability': 0.10,
+        'skill_level': 0.08,
+        'salary_fit': 0.07,
+        'skill_coverage_gain': 0.17,
+        'department_diversity': 0.04,
+        'cluster_balance': 0.04,
+        'leadership_bonus': 0.03,
+        'budget_penalty': 0.18
     }
 }
 
@@ -113,6 +158,209 @@ def build_feature_list(df):
     if missing:
         raise ValueError(f"Missing required feature columns: {missing}")
     return features
+
+
+def safe_ratio(numerator, denominator, default=0.0):
+    """Safely divide two numbers and fall back when denominator is zero."""
+    if denominator in (0, 0.0, None):
+        return default
+    return float(numerator) / float(denominator)
+
+
+def normalize_skill_name(skill_name):
+    """Normalize skill names to a consistent machine-readable key."""
+    text = str(skill_name or '').strip().lower().replace('-', '_').replace(' ', '_')
+    text = '_'.join(part for part in text.split('_') if part)
+    return CONFIG['SKILL_ALIASES'].get(text, text)
+
+
+def extend_skill_catalog(skill_names):
+    """Add newly observed skills so the model can train on flexible project inputs."""
+    for skill_name in skill_names:
+        canonical = normalize_skill_name(skill_name)
+        if canonical and canonical not in CONFIG['SKILLS']:
+            CONFIG['SKILLS'].append(canonical)
+
+
+def parse_skill_tokens(skills_text):
+    """Split free-text skill strings into normalized skill keys."""
+    raw_tokens = str(skills_text or '').replace('|', ',').replace(';', ',').split(',')
+    tokens = []
+    for token in raw_tokens:
+        canonical = normalize_skill_name(token)
+        if canonical:
+            tokens.append(canonical)
+    return list(dict.fromkeys(tokens))
+
+
+def expand_skill_requirement_names(skill_requirements):
+    """Expand comma-separated skill inputs into separate requirement entries."""
+    expanded = []
+    for item in skill_requirements or []:
+        raw_name = item.get('skill') or item.get('name') or ''
+        names = [
+            normalize_skill_name(part)
+            for part in str(raw_name).replace('|', ',').replace(';', ',').split(',')
+        ]
+        names = [name for name in names if name]
+        for name in names:
+            cloned = dict(item)
+            cloned['skill'] = name
+            cloned['name'] = name
+            expanded.append(cloned)
+    return expanded
+
+
+def parse_skill_scores(skill_scores_raw, fallback_skills='', fallback_level=0):
+    """Parse employee skill scores from JSON or `Skill:Score` text."""
+    parsed = {}
+
+    if isinstance(skill_scores_raw, dict):
+        for skill_name, score in skill_scores_raw.items():
+            canonical = normalize_skill_name(skill_name)
+            if not canonical:
+                continue
+            parsed[canonical] = float(np.clip(pd.to_numeric(score, errors='coerce') or 0, 0, 10))
+    else:
+        text = str(skill_scores_raw or '').strip()
+        if text:
+            try:
+                json_value = json.loads(text)
+                if isinstance(json_value, dict):
+                    return parse_skill_scores(json_value, fallback_skills, fallback_level)
+            except json.JSONDecodeError:
+                for part in text.replace('|', ',').replace(';', ',').split(','):
+                    skill_name, _, raw_score = part.partition(':')
+                    canonical = normalize_skill_name(skill_name)
+                    if not canonical:
+                        continue
+                    score = pd.to_numeric(raw_score, errors='coerce')
+                    parsed[canonical] = float(np.clip(score if pd.notna(score) else fallback_level, 0, 10))
+
+    if parsed:
+        return parsed
+
+    derived = {}
+    for skill_name in parse_skill_tokens(fallback_skills):
+        derived[skill_name] = float(np.clip(fallback_level, 0, 10))
+    return derived
+
+
+def priority_to_weight(priority_level):
+    """Convert a textual priority into a numeric importance weight."""
+    return float(CONFIG['PRIORITY_LEVELS'].get(str(priority_level or 'medium').strip().lower(), 0.6))
+
+
+def range_fit(score_value, min_score, max_score):
+    """Return how well a score fits a required range."""
+    score_value = float(score_value or 0)
+    min_score = float(min_score or 0)
+    max_score = max(min_score, float(max_score or min_score or 0))
+
+    if min_score <= score_value <= max_score:
+        return 1.0
+    if score_value > max_score:
+        return float(np.clip(safe_ratio(max_score, score_value, default=0.0), 0.55, 1.0))
+    if min_score <= 0:
+        return float(np.clip(safe_ratio(score_value, max_score or 1.0, default=0.0), 0.0, 1.0))
+    return float(np.clip(safe_ratio(score_value, min_score, default=0.0), 0.0, 1.0))
+
+
+def normalize_numeric_series(values, constant_value=1.0):
+    """Normalize numeric values to 0-1 range."""
+    arr = np.asarray(values, dtype=float)
+    if arr.size == 0:
+        return arr
+    min_v = float(np.min(arr))
+    max_v = float(np.max(arr))
+    if np.isclose(min_v, max_v):
+        return np.full(arr.shape, constant_value, dtype=float)
+    return (arr - min_v) / (max_v - min_v)
+
+
+def derive_experience_years(start_date_value):
+    """Convert a start date into years of experience."""
+    if pd.isna(start_date_value):
+        return np.nan
+
+    parsed = pd.to_datetime(start_date_value, errors='coerce')
+    if pd.isna(parsed):
+        return np.nan
+
+    years = (datetime.now() - parsed.to_pydatetime()).days / 365.25
+    return max(0.0, round(float(years), 2))
+
+
+def infer_employee_profile_fields(row):
+    """Infer missing HR fields from the raw employee CSV schema."""
+    department = str(row.get('Department', '') or row.get('Team', '') or 'General').strip() or 'General'
+    senior_flag = str(row.get('Senior Management', 'false')).strip().lower() == 'true'
+
+    role = str(row.get('Role', '')).strip()
+    if not role:
+        role = f"{department} Specialist"
+        if senior_flag:
+            role = f"Senior {department} Lead"
+
+    skills_text = str(row.get('Skills', '')).strip()
+    if not skills_text:
+        skills = [department.lower()]
+        if department.lower() in {'marketing', 'finance'}:
+            skills.extend(['analytics', 'communication'])
+        elif department.lower() in {'engineering', 'it', 'development', 'technology'}:
+            skills.extend(['backend', 'testing', 'devops'])
+        else:
+            skills.extend(['project_management', 'communication'])
+        if senior_flag:
+            skills.append('leadership')
+        skills_text = ', '.join(dict.fromkeys(skills))
+
+    return {
+        'Department': department,
+        'Role': role,
+        'Skills': skills_text
+    }
+
+
+def build_project_skill_vector(project_req):
+    """Create a normalized project requirement vector over the global skill space."""
+    project_vector = np.zeros(len(CONFIG['SKILLS']))
+    total_weight = max(sum(item['weight'] for item in project_req.skill_requirements), 1e-9)
+
+    for item in project_req.skill_requirements:
+        skill = item['skill']
+        weight = item['weight']
+        if skill in CONFIG['SKILLS']:
+            idx = CONFIG['SKILLS'].index(skill)
+            target_score = max(item.get('min_score', 0.0), item.get('max_score', 0.0)) / 10.0
+            project_vector[idx] = (weight * max(target_score, 0.1)) / total_weight
+
+    return project_vector
+
+
+def extract_employee_skill_vector(employee):
+    """Extract an employee skill vector aligned with the configured skill space."""
+    return np.array(
+        [float(employee.get(f'skill_{skill}', 0.0)) for skill in CONFIG['SKILLS']],
+        dtype=float
+    )
+
+
+def compute_team_skill_coverage(team_df, project_req):
+    """Measure how much of a project's required skill mix is covered by a team."""
+    if team_df is None or len(team_df) == 0:
+        return 0.0
+
+    weighted_coverage = 0.0
+    total_weight = max(sum(project_req.priority_skills.values()), 1e-9)
+    for skill, weight in project_req.priority_skills.items():
+        skill_col = f'skill_{skill}'
+        if skill_col not in team_df.columns:
+            continue
+        coverage = float(team_df[skill_col].mean())
+        weighted_coverage += weight * coverage
+
+    return float(weighted_coverage / total_weight)
 
 
 # ============================================================================
@@ -188,18 +436,26 @@ def preprocess_data(df):
         'employee id': 'Employee ID',
         'employee_id': 'Employee ID',
         'id': 'Employee ID',
+        'first name': 'Name',
         'name': 'Name',
         'skills': 'Skills',
+        'skill scores': 'Skill Scores',
+        'skill_scores': 'Skill Scores',
         'skill level': 'Skill Level',
         'skilllevel': 'Skill Level',
         'experience': 'Experience',
         'experience (years)': 'Experience',
+        'start date': 'Start Date',
         'category': 'Category',
         'availability': 'Availability',
         'performance rating': 'Performance Rating',
         'performance': 'Performance Rating',
+        'salary': 'Salary',
+        'bonus %': 'Bonus %',
+        'team': 'Department',
         'department': 'Department',
-        'role': 'Role'
+        'role': 'Role',
+        'senior management': 'Senior Management'
     }
     normalized_cols = {}
     for col in df_clean.columns:
@@ -207,20 +463,77 @@ def preprocess_data(df):
         normalized_cols[col] = column_map.get(key, col)
     df_clean = df_clean.rename(columns=normalized_cols)
 
-    required_cols = [
-        'Name',
-        'Skills',
-        'Skill Level',
-        'Experience',
-        'Category',
-        'Availability',
-        'Performance Rating',
-        'Department',
-        'Role'
-    ]
+    derived_profiles = df_clean.apply(infer_employee_profile_fields, axis=1, result_type='expand')
+    for col in ['Department', 'Role', 'Skills']:
+        if col not in df_clean.columns:
+            df_clean[col] = derived_profiles[col]
+        else:
+            df_clean[col] = (
+                df_clean[col]
+                .fillna('')
+                .astype(str)
+                .str.strip()
+                .replace('', np.nan)
+                .fillna(derived_profiles[col])
+            )
+
+    if 'Name' not in df_clean.columns:
+        df_clean['Name'] = [f'Employee {i + 1}' for i in range(len(df_clean))]
+    else:
+        df_clean['Name'] = df_clean['Name'].fillna('').astype(str).str.strip()
+        blank_name_mask = df_clean['Name'].eq('')
+        df_clean.loc[blank_name_mask, 'Name'] = [f'Employee {idx + 1}' for idx in df_clean.index[blank_name_mask]]
+
+    if 'Experience' not in df_clean.columns:
+        df_clean['Experience'] = np.nan
+    df_clean['Experience'] = pd.to_numeric(df_clean['Experience'], errors='coerce')
+    if 'Start Date' in df_clean.columns:
+        derived_experience = df_clean['Start Date'].apply(derive_experience_years)
+        df_clean['Experience'] = df_clean['Experience'].fillna(derived_experience)
+
+    if 'Salary' not in df_clean.columns:
+        df_clean['Salary'] = 0.0
+    df_clean['Salary'] = pd.to_numeric(df_clean['Salary'], errors='coerce').fillna(0.0)
+
+    if 'Bonus %' not in df_clean.columns:
+        df_clean['Bonus %'] = 0.0
+    df_clean['Bonus %'] = pd.to_numeric(df_clean['Bonus %'], errors='coerce').fillna(0.0)
+
+    if 'Category' not in df_clean.columns:
+        df_clean['Category'] = 'Full-time'
+    if 'Availability' not in df_clean.columns:
+        df_clean['Availability'] = 'Available'
+
+    if 'Performance Rating' not in df_clean.columns:
+        df_clean['Performance Rating'] = np.nan
+    derived_performance = np.clip(df_clean['Bonus %'] / 1.5, 0, 10)
+    df_clean['Performance Rating'] = pd.to_numeric(
+        df_clean['Performance Rating'], errors='coerce'
+    ).fillna(derived_performance)
+
+    if 'Skill Scores' not in df_clean.columns:
+        df_clean['Skill Scores'] = ''
+
+    if 'Skill Level' not in df_clean.columns:
+        df_clean['Skill Level'] = np.nan
+    senior_boost = (
+        df_clean.get('Senior Management', 'false')
+        .astype(str)
+        .str.strip()
+        .str.lower()
+        .eq('true')
+        .astype(float)
+    )
+    derived_skill_level = np.clip(3 + (df_clean['Bonus %'] / 2.0) + (senior_boost * 1.5), 1, 10)
+    df_clean['Skill Level'] = pd.to_numeric(
+        df_clean['Skill Level'], errors='coerce'
+    ).fillna(derived_skill_level)
+
+    required_cols = ['Name', 'Skills', 'Skill Level', 'Experience', 'Category',
+                     'Availability', 'Performance Rating', 'Department', 'Role']
     missing_cols = [c for c in required_cols if c not in df_clean.columns]
     if missing_cols:
-        raise ValueError(f"Missing required CSV columns: {missing_cols}")
+        raise ValueError(f"Missing required CSV columns after preprocessing: {missing_cols}")
 
     # Availability to numeric score
     df_clean['Availability'] = df_clean.get('Availability', '').astype(str).str.strip()
@@ -232,6 +545,21 @@ def preprocess_data(df):
     df_clean['Skill Level'] = pd.to_numeric(df_clean.get('Skill Level', 0), errors='coerce').fillna(0)
     df_clean['Experience'] = pd.to_numeric(df_clean.get('Experience', 0), errors='coerce').fillna(0)
     df_clean['Performance Rating'] = pd.to_numeric(df_clean.get('Performance Rating', 0), errors='coerce').fillna(0)
+    df_clean['Salary'] = pd.to_numeric(df_clean.get('Salary', 0), errors='coerce').fillna(0)
+    df_clean['Skill Scores'] = df_clean.get('Skill Scores', '').fillna('')
+
+    df_clean['Parsed Skill Scores'] = df_clean.apply(
+        lambda row: parse_skill_scores(
+            row.get('Skill Scores', ''),
+            fallback_skills=row.get('Skills', ''),
+            fallback_level=row.get('Skill Level', 0)
+        ),
+        axis=1
+    )
+    discovered_skills = set()
+    for item in df_clean['Parsed Skill Scores']:
+        discovered_skills.update(item.keys())
+    extend_skill_catalog(discovered_skills)
 
     # Encode categorical fields
     category_encoder = LabelEncoder()
@@ -279,31 +607,29 @@ def engineer_features(df):
     
     df_features = df.copy()
 
-    def extract_skill_tokens(text):
-        return [t.strip().lower() for t in str(text).split(',') if t.strip()]
-
     skill_keywords = {
-        'frontend': ['react', 'angular', 'vue', 'html', 'css', 'javascript', 'frontend'],
-        'backend': ['node', 'java', 'spring', 'django', 'backend', 'api'],
-        'data_science': ['ml', 'machine learning', 'data science', 'python', 'model', 'data'],
-        'database_design': ['sql', 'database', 'db', 'mysql', 'postgres', 'mongodb'],
-        'devops': ['devops', 'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'ci/cd'],
-        'security': ['security', 'infosec', 'compliance'],
+        'frontend': ['react', 'angular', 'vue', 'html', 'css', 'javascript', 'frontend', 'product', 'design'],
+        'backend': ['node', 'java', 'spring', 'django', 'backend', 'api', 'engineering', 'technology'],
+        'data_science': ['ml', 'machine learning', 'data science', 'python', 'model', 'data', 'finance', 'marketing', 'analytics'],
+        'database_design': ['sql', 'database', 'db', 'mysql', 'postgres', 'mongodb', 'finance', 'operations'],
+        'devops': ['devops', 'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'ci/cd', 'engineering', 'infrastructure'],
+        'security': ['security', 'infosec', 'compliance', 'legal', 'risk'],
         'leadership': ['lead', 'manager', 'senior', 'director', 'head'],
-        'ux_design': ['ux', 'ui', 'design', 'figma'],
-        'testing': ['testing', 'qa', 'automation', 'selenium'],
-        'analytics': ['analytics', 'bi', 'dashboard', 'report', 'data'],
-        'project_management': ['project', 'pm', 'scrum', 'agile'],
-        'communication': ['communication', 'presentation', 'stakeholder']
+        'ux_design': ['ux', 'ui', 'design', 'figma', 'product', 'marketing'],
+        'testing': ['testing', 'qa', 'automation', 'selenium', 'engineering', 'quality'],
+        'analytics': ['analytics', 'bi', 'dashboard', 'report', 'data', 'finance', 'marketing'],
+        'project_management': ['project', 'pm', 'scrum', 'agile', 'operations', 'client services'],
+        'communication': ['communication', 'presentation', 'stakeholder', 'sales', 'human resources', 'client services']
     }
 
     skill_indicator = {skill: [] for skill in CONFIG['SKILLS']}
     skill_counts = []
 
     for _, row in df_features.iterrows():
-        tokens = set(extract_skill_tokens(row.get('Skills', '')))
-        tokens.update(extract_skill_tokens(row.get('Role', '')))
-        tokens.update(extract_skill_tokens(row.get('Department', '')))
+        parsed_scores = dict(row.get('Parsed Skill Scores', {}) or {})
+        tokens = set(parse_skill_tokens(row.get('Skills', '')))
+        tokens.update(parse_skill_tokens(row.get('Role', '')))
+        tokens.update(parse_skill_tokens(row.get('Department', '')))
 
         active_skills = set()
         for skill, keywords in skill_keywords.items():
@@ -312,10 +638,20 @@ def engineer_features(df):
                     active_skills.add(skill)
                     break
 
-        for skill in CONFIG['SKILLS']:
-            skill_indicator[skill].append(1 if skill in active_skills else 0)
+        active_skills.update(parsed_scores.keys())
 
-        skill_counts.append(len(active_skills))
+        employee_skill_values = {}
+        for skill in CONFIG['SKILLS']:
+            base_score = float(parsed_scores.get(skill, 0.0))
+            inferred_score = 0.0
+            if skill in active_skills:
+                inferred_score = float(np.clip(row.get('Skill Level', 0), 0, 10))
+            employee_skill_values[skill] = max(base_score, inferred_score)
+
+        for skill in CONFIG['SKILLS']:
+            skill_indicator[skill].append(float(np.clip(employee_skill_values.get(skill, 0.0) / 10.0, 0, 1)))
+
+        skill_counts.append(sum(1 for value in employee_skill_values.values() if value > 0))
 
     for skill in CONFIG['SKILLS']:
         df_features[f'skill_{skill}'] = skill_indicator[skill]
@@ -324,6 +660,18 @@ def engineer_features(df):
     log_step(3, "Feature Engineering Complete", "Skill indicators and counts created")
     
     return df_features
+
+
+def export_vectorized_dataset(df_features):
+    """Save the structured employee feature vectors for direct dataset evaluation."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    output_path = os.path.join(script_dir, 'vectorized_employees.csv')
+    vector_columns = ['Employee ID', 'Name', 'Department', 'Role', 'Experience', 'Performance Rating']
+    vector_columns = [col for col in vector_columns if col in df_features.columns]
+    skill_columns = [f'skill_{skill}' for skill in CONFIG['SKILLS'] if f'skill_{skill}' in df_features.columns]
+    export_df = df_features[vector_columns + ['Skill Scores'] + skill_columns].copy() if 'Skill Scores' in df_features.columns else df_features[vector_columns + skill_columns].copy()
+    export_df.to_csv(output_path, index=False)
+    log_step(3, "Vectorized Dataset Saved", output_path)
 
 
 # ============================================================================
@@ -429,12 +777,13 @@ def compute_attention_weights(X_scaled, features_list):
             between_var += len(cluster_values) * (cluster_mean - global_mean) ** 2
             within_var += np.sum((cluster_values - cluster_mean) ** 2)
 
-        fisher_score = between_var / (within_var + 1e-9)
+        fisher_score = between_var / (within_var + 1e-6)
         fisher_scores.append(float(fisher_score))
 
     fisher_scores = np.array(fisher_scores)
 
-    # Softmax on normalized Fisher scores gives stable, non-uniform feature attention
+    # Compress extreme separability values so sparse binary indicators do not overwhelm the model.
+    fisher_scores = np.log1p(np.clip(fisher_scores, 0, np.percentile(fisher_scores, 95)))
     fisher_norm = (fisher_scores - np.mean(fisher_scores)) / (np.std(fisher_scores) + 1e-9)
     exp_scores = np.exp(fisher_norm)
     attention_weights = exp_scores / np.sum(exp_scores)
@@ -578,13 +927,7 @@ def rank_employees_by_similarity(df, skill_matrix, project_req, project_name):
         pd.DataFrame: Ranking with scores
     """
     # Create project skill vector
-    project_vector = np.zeros(len(CONFIG['SKILLS']))
-    total_weight = sum(project_req.priority_skills.values())
-    
-    for skill, weight in project_req.priority_skills.items():
-        if skill in CONFIG['SKILLS']:
-            idx = CONFIG['SKILLS'].index(skill)
-            project_vector[idx] = weight / total_weight
+    project_vector = build_project_skill_vector(project_req)
     
     # Compute attention and similarities
     attention_weights, weighted_skills, similarities = apply_attention_to_skills(
@@ -816,6 +1159,153 @@ def analyze_and_display_teams(df, cluster_labels):
         print()
 
 
+def find_classification_target_column(df):
+    """Return the first available column that can act as actual labels."""
+    for column in CONFIG['CLASSIFICATION_TARGET_COLUMNS']:
+        if column in df.columns and df[column].notna().any():
+            return column
+    return None
+
+
+def map_clusters_to_reference_labels(y_true, cluster_labels):
+    """Map each cluster id to its majority true label for classification metrics."""
+    mapping = {}
+    y_true_series = pd.Series(y_true).astype(str).reset_index(drop=True)
+    cluster_series = pd.Series(cluster_labels).reset_index(drop=True)
+
+    for cluster_id in sorted(cluster_series.unique()):
+        labels_in_cluster = y_true_series[cluster_series == cluster_id]
+        if labels_in_cluster.empty:
+            mapping[cluster_id] = f"Cluster {cluster_id}"
+        else:
+            mapping[cluster_id] = labels_in_cluster.value_counts().idxmax()
+
+    y_pred_mapped = cluster_series.map(mapping).astype(str)
+    return y_pred_mapped, mapping
+
+
+def display_classification_metrics(df, cluster_labels):
+    """
+    Display classification-style metrics for K-Means labels.
+
+    K-Means is unsupervised, so these metrics are optional diagnostics. If an
+    actual label column exists, each cluster is mapped to its majority label.
+    """
+    print_header("CLASSIFICATION METRICS", "-")
+
+    target_column = find_classification_target_column(df)
+    if target_column is None:
+        print("  [SKIPPED] No actual label column found for accuracy/confusion matrix.")
+        print("  Add a column such as 'Actual Team', 'Actual Label', 'Target', or 'Class' to enable this report.")
+        return None
+
+    if target_column == 'Department':
+        print("  [INFO] No explicit target column found; using Department as the reference label.")
+
+    y_true = df[target_column].fillna('Unknown').astype(str).reset_index(drop=True)
+    y_pred, cluster_mapping = map_clusters_to_reference_labels(y_true, cluster_labels)
+    labels = sorted(set(y_true.unique()).union(set(y_pred.unique())))
+
+    accuracy = accuracy_score(y_true, y_pred)
+    matrix = confusion_matrix(y_true, y_pred, labels=labels)
+    report = classification_report(y_true, y_pred, labels=labels, zero_division=0)
+
+    print(f"  Target Column: {target_column}")
+    print(f"  Accuracy Score: {accuracy:.4f}")
+    print("\n  Cluster to Label Mapping:")
+    for cluster_id, label in cluster_mapping.items():
+        print(f"    Cluster {cluster_id} -> {label}")
+
+    matrix_df = pd.DataFrame(
+        matrix,
+        index=[f"Actual {label}" for label in labels],
+        columns=[f"Pred {label}" for label in labels]
+    )
+    print("\n  Confusion Matrix:")
+    print(matrix_df.to_string())
+
+    print("\n  Classification Report:")
+    print(report)
+
+    return {
+        'target_column': target_column,
+        'accuracy': accuracy,
+        'confusion_matrix': matrix,
+        'classification_report': report,
+        'cluster_mapping': cluster_mapping
+    }
+
+
+def display_random_forest_evaluation(df, X_scaled):
+    """
+    Train and evaluate the Random Forest classifier from the Word-file ML flow.
+
+    The classifier needs actual labels. If the dataset has no explicit label
+    column, Department is used as a practical reference label for this HR data.
+    """
+    print_header("RANDOM FOREST MODEL EVALUATION", "-")
+
+    target_column = find_classification_target_column(df)
+    if target_column is None:
+        print("  [SKIPPED] No label column found for Random Forest training.")
+        print("  Add 'Label', 'Actual Team', 'Actual Label', 'Target', or 'Class' to enable this model.")
+        return None
+
+    y = df[target_column].fillna('Unknown').astype(str).reset_index(drop=True)
+    class_counts = y.value_counts()
+    if len(class_counts) < 2:
+        print("  [SKIPPED] Random Forest needs at least two label classes.")
+        return None
+
+    stratify = y if class_counts.min() >= 2 else None
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_scaled,
+        y,
+        test_size=0.2,
+        random_state=CONFIG['RANDOM_STATE'],
+        stratify=stratify
+    )
+
+    model = RandomForestClassifier(
+        n_estimators=100,
+        random_state=CONFIG['RANDOM_STATE']
+    )
+    model.fit(X_train, y_train)
+    predictions = model.predict(X_test)
+
+    labels = sorted(set(y_test.unique()).union(set(predictions)))
+    accuracy = accuracy_score(y_test, predictions)
+    matrix = confusion_matrix(y_test, predictions, labels=labels)
+    report = classification_report(y_test, predictions, labels=labels, zero_division=0)
+
+    print(f"  Target Column: {target_column}")
+    if target_column == 'Department':
+        print("  [INFO] Using Department as the reference label because no explicit class label was supplied.")
+    print("  Model: RandomForestClassifier(n_estimators=100, random_state=42)")
+    print(f"  Train/Test Split: {len(y_train)} train | {len(y_test)} test")
+    print(f"  Accuracy Score: {accuracy:.4f}")
+
+    matrix_df = pd.DataFrame(
+        matrix,
+        index=[f"Actual {label}" for label in labels],
+        columns=[f"Pred {label}" for label in labels]
+    )
+    print("\n  Confusion Matrix:")
+    print(matrix_df.to_string())
+
+    print("\n  Classification Report:")
+    print(report)
+
+    return {
+        'target_column': target_column,
+        'accuracy': accuracy,
+        'confusion_matrix': matrix,
+        'classification_report': report,
+        'labels': labels,
+        'model': model
+    }
+
+
 # ============================================================================
 # PARAMETER DISPLAY FUNCTIONS - Show basis and reasoning for team formation
 # ============================================================================
@@ -1013,7 +1503,8 @@ class ProjectRequirement:
     """Define project requirements for team formation."""
     
     def __init__(self, project_id, name, required_team_size, min_experience,
-                 max_budget, priority_skills, deadline_days=30):
+                 max_budget, priority_skills=None, deadline_days=30,
+                 skill_requirements=None, score_weights=None):
         """
         Initialize project requirements.
         
@@ -1031,11 +1522,40 @@ class ProjectRequirement:
         self.required_team_size = required_team_size
         self.min_experience = min_experience
         self.max_budget = max_budget
+        self.skill_requirements = []
+
+        raw_skill_requirements = expand_skill_requirement_names(skill_requirements or [])
+        if raw_skill_requirements:
+            for item in raw_skill_requirements:
+                skill_name = normalize_skill_name(item.get('skill') or item.get('name'))
+                if not skill_name:
+                    continue
+                self.skill_requirements.append({
+                    'skill': skill_name,
+                    'min_score': float(np.clip(item.get('min_score', item.get('minScore', 0)), 0, 10)),
+                    'max_score': float(np.clip(item.get('max_score', item.get('maxScore', 10)), 0, 10)),
+                    'priority': str(item.get('priority', 'medium')).strip().lower(),
+                    'weight': priority_to_weight(item.get('priority', 'medium'))
+                })
+
+        if not self.skill_requirements:
+            for skill, weight in (priority_skills or {}).items():
+                skill_name = normalize_skill_name(skill)
+                self.skill_requirements.append({
+                    'skill': skill_name,
+                    'min_score': 0.0,
+                    'max_score': 10.0,
+                    'priority': 'medium',
+                    'weight': float(weight)
+                })
+
+        extend_skill_catalog(item['skill'] for item in self.skill_requirements)
+
         # Normalize and validate required skills to prevent silent misses
         normalized = {}
-        for skill, weight in priority_skills.items():
-            canonical = CONFIG['SKILL_ALIASES'].get(skill, skill)
-            normalized[canonical] = weight
+        for item in self.skill_requirements:
+            canonical = normalize_skill_name(item['skill'])
+            normalized[canonical] = float(item['weight'])
         missing = [s for s in normalized.keys() if s not in CONFIG['SKILLS']]
         if missing:
             raise ValueError(
@@ -1044,10 +1564,65 @@ class ProjectRequirement:
             )
         self.priority_skills = normalized
         self.deadline_days = deadline_days
+        self.score_weights = score_weights or {
+            'skill_score': 0.5,
+            'experience': 0.25,
+            'performance': 0.25
+        }
         self.assigned_team = []
         self.total_salary = 0
         self.avg_experience = 0
         self.match_score = 0.0
+
+
+def load_project_requirements():
+    """Load flexible project definitions from JSON when available."""
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(script_dir, CONFIG['PROJECT_INPUT_FILE'])
+
+    if os.path.exists(config_path):
+        with open(config_path, 'r', encoding='utf-8') as handle:
+            payload = json.load(handle)
+
+        raw_projects = payload.get('projects', payload if isinstance(payload, list) else [])
+        projects = []
+        for item in raw_projects:
+            projects.append(
+                ProjectRequirement(
+                    project_id=item.get('project_id') or item.get('projectId') or 'UNSPECIFIED',
+                    name=item.get('name') or item.get('project_name') or item.get('projectName') or 'Untitled Project',
+                    required_team_size=int(item.get('required_team_size') or item.get('requiredTeamSize') or item.get('team_size') or item.get('teamSize') or 4),
+                    min_experience=float(item.get('min_experience') or item.get('minExperience') or 0),
+                    max_budget=float(item.get('max_budget') or item.get('maxBudget') or 0),
+                    priority_skills=item.get('priority_skills') or item.get('prioritySkills') or {},
+                    deadline_days=int(item.get('deadline_days') or item.get('deadlineDays') or 30),
+                    skill_requirements=item.get('skill_requirements') or item.get('skillRequirements') or [],
+                    score_weights=item.get('score_weights') or item.get('scoreWeights') or None
+                )
+            )
+        if projects:
+            log_step(9, "Project Definitions Loaded", f"{len(projects)} project(s) from {CONFIG['PROJECT_INPUT_FILE']}")
+            return projects
+
+    default_projects = [
+        ProjectRequirement(
+            project_id="PRJ-2026-001",
+            name="Skill-Based Team Formation",
+            required_team_size=5,
+            min_experience=2,
+            max_budget=200000,
+            skill_requirements=[
+                {"name": "java", "minScore": 5, "maxScore": 10, "priority": "critical"},
+                {"name": "css", "minScore": 6, "maxScore": 10, "priority": "high"},
+                {"name": "communication", "minScore": 8, "maxScore": 10, "priority": "high"},
+                {"name": "mongodb", "minScore": 3, "maxScore": 10, "priority": "medium"},
+            ],
+            deadline_days=30,
+            score_weights={"skill_score": 0.5, "experience": 0.25, "performance": 0.25}
+        )
+    ]
+    log_step(9, "Project Definitions Loaded", "Using built-in flexible project template")
+    return default_projects
 
 
 def score_employee_for_project(employee, project_req):
@@ -1061,31 +1636,140 @@ def score_employee_for_project(employee, project_req):
     Returns:
         float: Match score (0-100)
     """
-    score = 0.0
+    weights = CONFIG['PROJECT_SCORING_WEIGHTS']
+    project_vector = build_project_skill_vector(project_req)
+    employee_vector = extract_employee_skill_vector(employee)
 
-    # Experience requirement (0-30)
-    if employee['Experience'] >= project_req.min_experience:
-        score += 30
+    skill_similarity = compute_skill_similarity(employee_vector, project_vector)
+    total_priority = max(sum(item['weight'] for item in project_req.skill_requirements), 1e-9)
+    skill_range_fit = 0.0
+    for item in project_req.skill_requirements:
+        employee_skill_value = float(employee.get(f"skill_{item['skill']}", 0.0) or 0.0) * 10.0
+        skill_range_fit += item['weight'] * range_fit(
+            employee_skill_value,
+            item.get('min_score', 0.0),
+            item.get('max_score', 10.0)
+        )
+    skill_score_fit = skill_range_fit / total_priority if total_priority > 0 else 0.0
+
+    experience_fit = min(1.0, safe_ratio(employee['Experience'], max(1.0, project_req.min_experience), default=0.0))
+    performance_fit = np.clip(employee['Performance Rating'] / 10.0, 0, 1)
+    availability_fit = np.clip(employee['Availability Score'], 0, 1)
+    skill_level_fit = np.clip(employee['Skill Level'] / 10.0, 0, 1)
+
+    salary_value = float(employee.get('Salary', 0.0) or 0.0)
+    target_salary = safe_ratio(project_req.max_budget, max(1, project_req.required_team_size), default=salary_value)
+    if salary_value <= 0 or target_salary <= 0:
+        salary_fit = 1.0
+    elif salary_value <= target_salary:
+        salary_fit = 1.0
     else:
-        exp_ratio = employee['Experience'] / max(1, project_req.min_experience)
-        score += 30 * exp_ratio
+        salary_fit = np.clip(target_salary / salary_value, 0, 1)
 
-    # Performance rating (0-25), assume 0-10 scale
-    score += min(25, (employee['Performance Rating'] / 10) * 25)
+    versatility = np.clip(
+        safe_ratio(employee.get('Skill Count', 0), max(1, len(CONFIG['SKILLS'])), default=0.0),
+        0,
+        1
+    )
 
-    # Availability score (0-15)
-    score += min(15, employee['Availability Score'] * 15)
+    leadership_bonus = 0.0
+    if 'leadership' in project_req.priority_skills:
+        leadership_bonus = float(employee.get('skill_leadership', 0))
 
-    # Skill level (0-15), assume 1-10 scale
-    score += min(15, (employee['Skill Level'] / 10) * 15)
+    configured = project_req.score_weights or {}
+    project_skill_weight = float(configured.get('skill_score', 0.5))
+    project_experience_weight = float(configured.get('experience', 0.25))
+    project_performance_weight = float(configured.get('performance', 0.25))
 
-    # Skill match to project priorities (0-15)
-    required_skills = [s for s in project_req.priority_skills.keys() if s in CONFIG['SKILLS']]
-    if required_skills:
-        hits = sum(1 for s in required_skills if employee.get(f'skill_{s}', 0) == 1)
-        score += (hits / len(required_skills)) * 15
+    blended_skill_fit = (0.45 * skill_similarity) + (0.55 * skill_score_fit)
 
-    return min(100.0, score)
+    core_score = (
+        (project_skill_weight * blended_skill_fit) +
+        (project_experience_weight * experience_fit) +
+        (project_performance_weight * performance_fit)
+    )
+    secondary_score = (
+        (weights['availability'] * availability_fit) +
+        (weights['skill_level'] * skill_level_fit) +
+        (weights['salary_fit'] * salary_fit) +
+        (0.03 * versatility) +
+        (weights['leadership_bonus'] * leadership_bonus)
+    )
+    score = 100 * (core_score + (0.35 * secondary_score))
+
+    return float(np.clip(score, 0, 100))
+
+
+def select_best_team_for_project(available_df, project_req, score_column):
+    """
+    Build a team iteratively using fit, incremental skill coverage, diversity, and budget.
+    """
+    if len(available_df) == 0:
+        return available_df.head(0)
+
+    weights = CONFIG['PROJECT_SCORING_WEIGHTS']
+    selected_indices = []
+    current_salary = 0.0
+    required_team_size = min(project_req.required_team_size, len(available_df))
+
+    for _ in range(required_team_size):
+        selected_team = available_df.loc[selected_indices] if selected_indices else available_df.head(0)
+        current_coverage = compute_team_skill_coverage(selected_team, project_req)
+        cluster_counts = (
+            selected_team['Cluster'].value_counts().to_dict()
+            if len(selected_team) > 0 and 'Cluster' in selected_team.columns
+            else {}
+        )
+        dept_counts = (
+            selected_team['Department'].value_counts().to_dict()
+            if len(selected_team) > 0 else {}
+        )
+
+        best_idx = None
+        best_objective = -np.inf
+
+        for idx, candidate in available_df.iterrows():
+            if idx in selected_indices:
+                continue
+
+            candidate_team = available_df.loc[selected_indices + [idx]]
+            new_coverage = compute_team_skill_coverage(candidate_team, project_req)
+            coverage_gain = max(0.0, new_coverage - current_coverage)
+
+            department_bonus = 1.0 if dept_counts.get(candidate['Department'], 0) == 0 else 0.0
+            cluster_bonus = 0.0
+            cluster_id = candidate.get('Cluster')
+            if cluster_id is not None:
+                cluster_bonus = 1.0 / (1.0 + cluster_counts.get(cluster_id, 0))
+
+            candidate_salary = float(candidate.get('Salary', 0.0) or 0.0)
+            projected_salary = current_salary + candidate_salary
+            budget_penalty = 0.0
+            if project_req.max_budget > 0 and projected_salary > project_req.max_budget:
+                budget_penalty = min(
+                    1.0,
+                    (projected_salary - project_req.max_budget) / project_req.max_budget
+                )
+
+            objective = (
+                0.55 * safe_ratio(candidate[score_column], 100.0, default=0.0) +
+                (weights['skill_coverage_gain'] * coverage_gain) +
+                (weights['department_diversity'] * department_bonus) +
+                (weights['cluster_balance'] * cluster_bonus) -
+                (weights['budget_penalty'] * budget_penalty)
+            )
+
+            if objective > best_objective:
+                best_objective = objective
+                best_idx = idx
+
+        if best_idx is None:
+            break
+
+        selected_indices.append(best_idx)
+        current_salary += float(available_df.loc[best_idx].get('Salary', 0.0) or 0.0)
+
+    return available_df.loc[selected_indices].sort_values(score_column, ascending=False)
 
 
 def assign_teams_to_project(df_features, cluster_labels, projects_list):
@@ -1110,10 +1794,21 @@ def assign_teams_to_project(df_features, cluster_labels, projects_list):
         df_temp[f'Score_{project.project_id}'] = df_temp.apply(
             lambda row: score_employee_for_project(row, project), axis=1
         )
-    
-    # Assign employees to projects
+
+    # Assign harder-to-fill projects first so scarce skills are not consumed early.
+    projects_ordered = sorted(
+        projects_list,
+        key=lambda p: (
+            -p.min_experience,
+            -len(p.priority_skills),
+            -max(p.priority_skills.values()),
+            -p.required_team_size,
+            p.deadline_days
+        )
+    )
+
     assigned_count = 0
-    for project in projects_list:
+    for project in projects_ordered:
         # Get unassigned employees
         available = df_temp[df_temp['Project'].isna()].copy()
         
@@ -1121,11 +1816,15 @@ def assign_teams_to_project(df_features, cluster_labels, projects_list):
             print(f"\n[WARNING] No available employees for project {project.name}")
             continue
         
-        # Sort by project-specific score
-        available = available.sort_values(f'Score_{project.project_id}', ascending=False)
-        
-        # Select required team size
-        team = available.head(project.required_team_size)
+        score_col = f'Score_{project.project_id}'
+        available = available.sort_values(score_col, ascending=False)
+
+        candidate_pool_size = min(
+            max(project.required_team_size * 6, project.required_team_size),
+            len(available)
+        )
+        candidate_pool = available.head(candidate_pool_size).copy()
+        team = select_best_team_for_project(candidate_pool, project, score_col)
         
         if len(team) < project.required_team_size:
             print(f"[WARNING] Not enough employees for project {project.name}")
@@ -1134,18 +1833,19 @@ def assign_teams_to_project(df_features, cluster_labels, projects_list):
         # Assign team to project
         team_indices = team.index
         df_temp.loc[team_indices, 'Project'] = project.project_id
-        df_temp.loc[team_indices, 'Match_Score'] = team[f'Score_{project.project_id}'].values
+        df_temp.loc[team_indices, 'Match_Score'] = team[score_col].values
         
         # Update project with team data
         project.assigned_team = team[
-            ['Name', 'Department', 'Role', 'Experience', 'Skill Level', 'Performance Rating', 'Availability Score']
+            ['Name', 'Department', 'Role', 'Experience', 'Skill Level',
+             'Performance Rating', 'Availability Score', 'Salary']
         ].to_dict('records')
-        project.total_salary = 0
+        project.total_salary = float(team['Salary'].sum()) if 'Salary' in team.columns else 0.0
         project.avg_experience = team['Experience'].mean()
-        project.match_score = team[f'Score_{project.project_id}'].mean()
-        
+        project.match_score = team[score_col].mean()
+
         assigned_count += len(team)
-    
+
     return projects_list, df_temp
 
 
@@ -1173,7 +1873,14 @@ def display_project_assignments(projects_list, df_assigned):
         print(f"  * Team Size: {project.required_team_size} members")
         print(f"  * Min Experience: {project.min_experience} years")
         print(f"  * Deadline: {project.deadline_days} days")
-        print(f"  * Priority Skills: {', '.join(project.priority_skills.keys())}\n")
+        print(f"  * Weighted Factors: Skill {project.score_weights.get('skill_score', 0):.0%}, Experience {project.score_weights.get('experience', 0):.0%}, Performance {project.score_weights.get('performance', 0):.0%}")
+        print(f"  * Required Skills:")
+        for item in project.skill_requirements:
+            print(
+                f"      - {item['skill']} | Range {item['min_score']:.0f}-{item['max_score']:.0f} | "
+                f"Priority {item['priority'].title()}"
+            )
+        print()
         
         print(f"ASSIGNED TEAM MEMBERS:")
         print(f"{'-' * CONFIG['OUTPUT_WIDTH']}\n")
@@ -1185,6 +1892,7 @@ def display_project_assignments(projects_list, df_assigned):
         print(f"  * Total Members: {len(project.assigned_team)}")
         print(f"  * Avg Experience: {project.avg_experience:.1f} years")
         print(f"  * Match Score: {project.match_score:.2f}/100")
+        print(f"  * Total Salary: ${project.total_salary:,.0f}")
         print()
 
 
@@ -1193,8 +1901,8 @@ def display_project_summary(projects_list):
     print_header("PROJECT ASSIGNMENT SUMMARY")
     
     print("\nPROJECT OVERVIEW:")
-    print(f"\n{'Project Name':<30} {'Team Size':<12} {'Match Score':<15}")
-    print(f"{'-' * 60}")
+    print(f"\n{'Project Name':<30} {'Team Size':<12} {'Match Score':<15} {'Salary':<15}")
+    print(f"{'-' * 78}")
     
     total_people_assigned = 0
     
@@ -1204,9 +1912,9 @@ def display_project_summary(projects_list):
             people = len(project.assigned_team)
             total_people_assigned += people
             
-            print(f"{project.name:<30} {people:<12} {match:<15}")
+            print(f"{project.name:<30} {people:<12} {match:<15} ${project.total_salary:<14,.0f}")
     
-    print(f"{'-' * 60}")
+    print(f"{'-' * 78}")
     print(f"\nAGGREGATE METRICS:")
     print(f"  * Total Projects: {len([p for p in projects_list if p.assigned_team])}")
     print(f"  * Total People Assigned: {total_people_assigned}")
@@ -1970,6 +2678,7 @@ def main():
         
         # Step 3: Feature Engineering
         df_features = engineer_features(df_clean)
+        export_vectorized_dataset(df_features)
         
         # Step 4: Select & Scale Features
         features_list = build_feature_list(df_features)
@@ -2006,49 +2715,13 @@ def main():
         
         # Step 8: Analyze & Display Results
         analyze_and_display_teams(df_features, cluster_labels)
+        classification_metrics = display_classification_metrics(df_features, cluster_labels)
+        random_forest_metrics = display_random_forest_evaluation(df_features, X_scaled)
         
         # Step 9: Define Projects and Assign Teams
         print_header("STEP 9: PROJECT ASSIGNMENT & TEAM MATCHING")
         
-        # Define sample projects with requirements
-        projects = [
-            ProjectRequirement(
-                project_id="PROJ001",
-                name="Mobile App Development",
-                required_team_size=5,
-                min_experience=3,
-                max_budget=200000,
-                priority_skills={'frontend': 0.4, 'backend': 0.3, 'testing': 0.3},
-                deadline_days=45
-            ),
-            ProjectRequirement(
-                project_id="PROJ002",
-                name="Data Analytics Platform",
-                required_team_size=4,
-                min_experience=4,
-                max_budget=180000,
-                priority_skills={'data_science': 0.5, 'databases': 0.3, 'analytics': 0.2},
-                deadline_days=30
-            ),
-            ProjectRequirement(
-                project_id="PROJ003",
-                name="Cloud Infrastructure",
-                required_team_size=3,
-                min_experience=5,
-                max_budget=150000,
-                priority_skills={'leadership': 0.4, 'devops': 0.4, 'security': 0.2},
-                deadline_days=60
-            ),
-            ProjectRequirement(
-                project_id="PROJ004",
-                name="Web Portal Redesign",
-                required_team_size=4,
-                min_experience=2,
-                max_budget=160000,
-                priority_skills={'frontend': 0.5, 'ux_design': 0.3, 'testing': 0.2},
-                deadline_days=35
-            )
-        ]
+        projects = load_project_requirements()
         
         # Assign teams to projects
         projects_with_teams, df_assigned = assign_teams_to_project(
@@ -2076,6 +2749,10 @@ def main():
         print(f"[OK] Teams Formed: {optimal_k}")
         print(f"[OK] Total Employees Processed: {len(df_features)}")
         print(f"[OK] Silhouette Score: {max(eval_results, key=lambda x: x['silhouette'])['silhouette']:.4f}")
+        if classification_metrics is not None:
+            print(f"[OK] Accuracy Score: {classification_metrics['accuracy']:.4f}")
+        if random_forest_metrics is not None:
+            print(f"[OK] Random Forest Accuracy: {random_forest_metrics['accuracy']:.4f}")
         print(f"[OK] Projects Assigned: {sum(1 for p in projects_with_teams if p.assigned_team)}")
         print(f"[OK] Total Employees Assigned to Projects: {len(df_assigned[df_assigned['Project'].notna()])}")
         print(f"[OK] Visualizations Generated: 9 PNG files")

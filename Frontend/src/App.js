@@ -9,6 +9,7 @@ import TeamFormation from './components/TeamFormation';
 import TeamResults from './components/TeamResults';
 import Login from './components/Login';
 import CandidateImport from './components/CandidateImport';
+import ResumeUpload from './components/ResumeUpload';
 import './App.css';
 
 const AUTH_KEY = 'skillbase_auth_user';
@@ -52,8 +53,10 @@ function AppContent({ isAuthenticated, onLogout, onLogin }) {
             <Route path="/add-employee" element={<AddEmployee />} />
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/candidate-import" element={<CandidateImport />} />
+            <Route path="/resume-upload" element={<ResumeUpload />} />
             <Route path="/team" element={<TeamFormation />} />
             <Route path="/results" element={<TeamResults />} />
+            <Route path="/results/:projectKey" element={<TeamResults />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -68,9 +71,13 @@ function App() {
 
   const isAuthenticated = useMemo(() => Boolean(authUser), [authUser]);
 
-  const handleLogin = (email) => {
-    localStorage.setItem(AUTH_KEY, email);
-    setAuthUser(email);
+  const handleLogin = (session) => {
+    const authSession = JSON.stringify({
+      ...session,
+      loggedInAt: new Date().toISOString(),
+    });
+    localStorage.setItem(AUTH_KEY, authSession);
+    setAuthUser(authSession);
   };
 
   const handleLogout = () => {
