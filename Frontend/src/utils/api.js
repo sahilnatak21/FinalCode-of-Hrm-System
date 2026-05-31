@@ -66,6 +66,11 @@ export const getEmployeeById = async (id) => {
   return handleResponse(response);
 };
 
+export const getEmployeeByUsername = async (username) => {
+  const response = await fetch(`${EMPLOYEE_API_BASE_URL}/username/${encodeURIComponent(username)}`);
+  return handleResponse(response);
+};
+
 export const createEmployee = async (employeeData) => {
   try {
     const response = await fetch(EMPLOYEE_API_BASE_URL, {
@@ -307,6 +312,34 @@ export const subscribeToStats = (onData) => {
 };
 
 // ── Resume Extraction APIs ────────────────────────────────────────────────────
+
+/**
+ * parseJD — send JD text or file to get a parsed JD object.
+ * @param {string|null} jdText
+ * @param {File|null}   jdFile
+ */
+export const parseJD = async (jdText = null, jdFile = null) => {
+  const form = new FormData();
+  if (jdText)  form.append('jd_text', jdText);
+  if (jdFile)  form.append('jd_file', jdFile);
+  const response = await fetch(`${RESUME_API_BASE_URL}/parse-jd`, { method: 'POST', body: form });
+  return handleResponse(response);
+};
+
+/**
+ * extractAndMatch — batch-extract resumes and match them against a JD.
+ * @param {File[]}      files
+ * @param {string|null} jdText
+ * @param {File|null}   jdFile
+ */
+export const extractAndMatch = async (files, jdText = null, jdFile = null) => {
+  const form = new FormData();
+  files.forEach((f) => form.append('files', f));
+  if (jdText)  form.append('jd_text', jdText);
+  if (jdFile)  form.append('jd_file', jdFile);
+  const response = await fetch(`${RESUME_API_BASE_URL}/extract-and-match`, { method: 'POST', body: form });
+  return handleResponse(response);
+};
 
 /**
  * extractResume — upload a single resume file and get back a structured profile.

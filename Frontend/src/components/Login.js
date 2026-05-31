@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 
 const AUTH_API_BASE_URL  = process.env.REACT_APP_AUTH_API_URL  || 'http://localhost:8080/api/auth';
 const SETUP_API_BASE_URL = process.env.REACT_APP_SETUP_API_URL || 'http://localhost:8080/api/setup';
@@ -133,6 +133,16 @@ const Login = ({ onLogin }) => {
 
           <div className="login-hint">
             <span>HR Admin:</span> hr_admin &nbsp;·&nbsp; <span>Employee:</span> employee_user
+          </div>
+
+          <div style={{ textAlign: 'center', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+            <span style={{ fontSize: '0.88rem', color: '#64748b' }}>Don't have an account?&nbsp;</span>
+            <Link
+              to="/create-user"
+              style={{ fontSize: '0.88rem', color: '#4f8ef7', fontWeight: 600, textDecoration: 'none' }}
+            >
+              Create new user
+            </Link>
           </div>
         </form>
       </div>

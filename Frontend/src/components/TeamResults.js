@@ -25,6 +25,13 @@ const initials = (name = '') =>
   name.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('');
 
 /* ── MemberCard ───────────────────────────────────────────────────────────── */
+const AVAIL_STYLES = {
+  available:   { bg: '#f0fdf4', color: '#16a34a', dot: '#22c55e', label: 'Available'   },
+  busy:        { bg: '#fefce8', color: '#ca8a04', dot: '#eab308', label: 'Busy'        },
+  'on leave':  { bg: '#fff7ed', color: '#ea580c', dot: '#f97316', label: 'On Leave'    },
+  unavailable: { bg: '#fef2f2', color: '#dc2626', dot: '#ef4444', label: 'Unavailable' },
+};
+
 const MemberCard = ({ member, requiredSkills }) => {
   const name = member.name || member['First Name'] || 'Employee';
   const color = avatarColor(name);
@@ -33,6 +40,9 @@ const MemberCard = ({ member, requiredSkills }) => {
   const expMatch   = Number(fit.experienceMatch || 0);
   const perfMatch  = Number(fit.performanceMatch || 0);
   const matchScore = Number(member.matchScore || 0);
+
+  const availKey = String(member.availability || 'available').trim().toLowerCase();
+  const avail    = AVAIL_STYLES[availKey] || AVAIL_STYLES['available'];
 
   return (
     <article className="member-card">
@@ -43,6 +53,16 @@ const MemberCard = ({ member, requiredSkills }) => {
           <h3 className="member-name">{name}</h3>
           <span className="member-role">{member.role || member.department || 'Employee'}</span>
           <span className="member-dept">{member.department || ''}</span>
+          {/* Availability badge */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            marginTop: 4, padding: '2px 8px', borderRadius: 99,
+            background: avail.bg, color: avail.color,
+            fontSize: '0.72rem', fontWeight: 600,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: avail.dot, flexShrink: 0 }} />
+            {avail.label}
+          </span>
         </div>
         <div className="member-match-badge" style={{ background: matchScore >= 70 ? '#dcfce7' : matchScore >= 45 ? '#fef3c7' : '#fee2e2', color: matchScore >= 70 ? '#166534' : matchScore >= 45 ? '#92400e' : '#991b1b' }}>
           {fmt(matchScore)}%
@@ -147,6 +167,57 @@ const TeamResults = () => {
     if (team.leader) return normalizeEmployeeSkillProfile(team.leader);
     return allMembers.find((m) => m.isLeader) || null;
   }, [team, allMembers]);
+
+  /* ── multi-team comparison ── */
+  const isMultiTeam = teams.length > 1;
+
+  const teamStats = useMemo(() => {
+    if (!isMultiTeam) return [];
+    return teams.map((group) => {
+      const members = group.members || [];
+      const avg = (fn) => members.length ? members.reduce((s, m) => s + Number(fn(m) || 0), 0) / members.length : 0;
+      const skillCoverage = requiredSkills.map((sk) => {
+        const fits = members.map((m) => {
+          const bd = (m.teamFit?.skillBreakdown || []).find((i) => i.skill === sk.name || i.requirementId === sk.id);
+          return Number(bd?.fit || 0) * 100;
+        });
+        return { name: sk.name, priority: sk.priority, coverage: fits.length ? fits.reduce((s, v) => s + v, 0) / fits.length : 0 };
+      });
+      const leader = members.find((m) => m.isLeader) || members[0] || null;
+      return {
+        teamName:      group.teamName,
+        size:          members.length,
+        avgMatch:      avg((m) => m.matchScore || 0),
+        avgExperience: avg((m) => m.experience || 0),
+        avgPerformance:avg((m) => m.performanceRating || m.score || 0),
+        avgSkillLevel: avg((m) => m.skillLevel || 0),
+        avgFinalScore: avg((m) => m.finalCandidateScore || m.matchScore || 0),
+        leaderName:    leader ? (leader.name || 'N/A') : 'N/A',
+        leaderScore:   leader ? Number(leader.leaderScore || 0) : 0,
+        skillCoverage,
+        members,
+      };
+    });
+  }, [teams, isMultiTeam, requiredSkills]);
+
+  // Which team wins each metric
+  const winners = useMemo(() => {
+    if (!teamStats.length) return {};
+    const bestIdx = (fn) => {
+      let best = -1, bestVal = -Infinity;
+      teamStats.forEach((t, i) => { const v = fn(t); if (v > bestVal) { bestVal = v; best = i; } });
+      return best;
+    };
+    return {
+      avgMatch:       bestIdx((t) => t.avgMatch),
+      avgExperience:  bestIdx((t) => t.avgExperience),
+      avgPerformance: bestIdx((t) => t.avgPerformance),
+      avgSkillLevel:  bestIdx((t) => t.avgSkillLevel),
+      avgFinalScore:  bestIdx((t) => t.avgFinalScore),
+    };
+  }, [teamStats]);
+
+  const TEAM_COLORS = ['#2563eb', '#0d9488', '#7c3aed', '#d97706', '#dc2626'];
 
   /* chart data */
   const chartData = useMemo(() => {
@@ -495,6 +566,157 @@ const TeamResults = () => {
               </div>
             </>
           )}
+        </section>
+      )}
+
+      {/* ── Multi-team comparison ── */}
+      {isMultiTeam && teamStats.length > 0 && (
+        <section className="panel panel-strong" style={{ marginTop: 20 }}>
+          <div className="section-title-row">
+            <div>
+              <h2 className="formation-title">Team Comparison</h2>
+              <p className="helper-text">{teams.length} teams formed for the same project — compare metrics side by side.</p>
+            </div>
+            <span className="chip info">{teams.length} teams</span>
+          </div>
+
+          {/* ── Metric comparison table ── */}
+          <div className="table-scroll" style={{ marginBottom: 24 }}>
+            <table className="metrics-table">
+              <thead>
+                <tr>
+                  <th>Metric</th>
+                  {teamStats.map((t, i) => (
+                    <th key={t.teamName} style={{ color: TEAM_COLORS[i % TEAM_COLORS.length] }}>
+                      {t.teamName}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { key: 'avgMatch',       label: 'Avg Match Score', fmt: (v) => `${fmt(v)}%` },
+                  { key: 'avgFinalScore',  label: 'Avg Candidate Score', fmt: (v) => `${fmt(v)}%` },
+                  { key: 'avgExperience',  label: 'Avg Experience', fmt: (v) => `${fmt(v)} yrs` },
+                  { key: 'avgPerformance', label: 'Avg Performance', fmt: (v) => `${fmt(v)}/10` },
+                  { key: 'avgSkillLevel',  label: 'Avg Skill Level', fmt: (v) => `${fmt(v)}/10` },
+                ].map(({ key, label, fmt: fmtFn }) => (
+                  <tr key={key}>
+                    <th>{label}</th>
+                    {teamStats.map((t, i) => {
+                      const isWinner = winners[key] === i;
+                      return (
+                        <td key={t.teamName} style={{ fontWeight: isWinner ? 700 : 400, color: isWinner ? TEAM_COLORS[i % TEAM_COLORS.length] : undefined }}>
+                          {fmtFn(t[key])}
+                          {isWinner && <span style={{ marginLeft: 6, fontSize: '0.75rem' }}>★</span>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+                <tr>
+                  <th>Team Size</th>
+                  {teamStats.map((t) => <td key={t.teamName}>{t.size} members</td>)}
+                </tr>
+                <tr>
+                  <th>Team Leader</th>
+                  {teamStats.map((t, i) => (
+                    <td key={t.teamName} style={{ color: TEAM_COLORS[i % TEAM_COLORS.length], fontWeight: 600 }}>
+                      {t.leaderName}
+                    </td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* ── Visual bar comparison ── */}
+          <div className="comparison-bars-section">
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+              Score Comparison
+            </h3>
+            {[
+              { label: 'Avg Match Score',     key: 'avgMatch',       max: 100 },
+              { label: 'Avg Experience (×10)', key: 'avgExperience',  max: 15 },
+              { label: 'Avg Performance',      key: 'avgPerformance', max: 10 },
+            ].map(({ label, key, max }) => (
+              <div key={key} className="cmp-bar-group">
+                <div className="cmp-bar-label">{label}</div>
+                {teamStats.map((t, i) => (
+                  <div className="cmp-bar-row" key={t.teamName}>
+                    <span className="cmp-bar-name" style={{ color: TEAM_COLORS[i % TEAM_COLORS.length] }}>
+                      {t.teamName}
+                    </span>
+                    <div className="cmp-bar-track">
+                      <div
+                        className="cmp-bar-fill"
+                        style={{
+                          width: `${Math.min(100, (t[key] / max) * 100)}%`,
+                          background: TEAM_COLORS[i % TEAM_COLORS.length],
+                        }}
+                      />
+                    </div>
+                    <strong className="cmp-bar-val">
+                      {key === 'avgMatch' ? `${fmt(t[key])}%` : key === 'avgExperience' ? `${fmt(t[key])} yrs` : `${fmt(t[key])}/10`}
+                    </strong>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* ── Skill coverage comparison ── */}
+          {requiredSkills.length > 0 && (
+            <div style={{ marginTop: 24 }}>
+              <h3 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 14 }}>
+                Skill Coverage per Team
+              </h3>
+              {requiredSkills.map((sk) => (
+                <div key={sk.name} className="cmp-skill-group">
+                  <div className="cmp-skill-name">
+                    {sk.name}
+                    <span className={`chip ${sk.priority === 'critical' ? 'bad' : sk.priority === 'high' ? 'warn' : 'info'}`} style={{ marginLeft: 8, fontSize: '0.65rem' }}>
+                      {sk.priority}
+                    </span>
+                  </div>
+                  {teamStats.map((t, i) => {
+                    const cov = t.skillCoverage.find((s) => s.name === sk.name)?.coverage ?? 0;
+                    return (
+                      <div className="cmp-bar-row" key={t.teamName}>
+                        <span className="cmp-bar-name" style={{ color: TEAM_COLORS[i % TEAM_COLORS.length] }}>{t.teamName}</span>
+                        <div className="cmp-bar-track">
+                          <div className="cmp-bar-fill" style={{ width: `${Math.min(100, cov)}%`, background: TEAM_COLORS[i % TEAM_COLORS.length] }} />
+                        </div>
+                        <strong className="cmp-bar-val">{fmt(cov)}%</strong>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Recommended team banner ── */}
+          {(() => {
+            const bestIdx = winners.avgFinalScore ?? winners.avgMatch ?? 0;
+            const best = teamStats[bestIdx];
+            if (!best) return null;
+            return (
+              <div className="recommended-team-banner" style={{ marginTop: 24, background: `${TEAM_COLORS[bestIdx % TEAM_COLORS.length]}15`, border: `2px solid ${TEAM_COLORS[bestIdx % TEAM_COLORS.length]}`, borderRadius: 12, padding: '1rem 1.25rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span style={{ fontSize: '1.5rem' }}>🏆</span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: '1rem', color: TEAM_COLORS[bestIdx % TEAM_COLORS.length] }}>
+                      Recommended: {best.teamName}
+                    </div>
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: 2 }}>
+                      Highest average candidate score ({fmt(best.avgFinalScore)}%) · Leader: {best.leaderName} · {best.size} members
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </section>
       )}
 

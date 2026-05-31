@@ -1,0 +1,442 @@
+/* ── Root ── */
+.ed-root {
+  min-height: 100vh;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Loading / Not-found ── */
+.ed-loading {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.ed-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #4f8ef7;
+  border-radius: 50%;
+  animation: ed-spin 0.7s linear infinite;
+}
+
+@keyframes ed-spin { to { transform: rotate(360deg); } }
+
+.ed-notfound-icon { font-size: 3rem; }
+.ed-notfound-text { font-size: 1rem; font-weight: 600; color: #374151; margin: 0; }
+.ed-notfound-sub  { font-size: 0.85rem; color: #94a3b8; margin: 0; }
+
+.ed-logout-plain {
+  background: none;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 0.5rem 1.25rem;
+  color: #64748b;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin-top: 0.5rem;
+}
+
+/* ── Navbar ── */
+.ed-nav {
+  background: #fff;
+  border-bottom: 1.5px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 2rem;
+  height: 60px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.ed-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ed-nav-brand-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.ed-nav-brand-sub {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  background: #f1f5f9;
+  padding: 0.15rem 0.55rem;
+  border-radius: 99px;
+  font-weight: 500;
+}
+
+.ed-nav-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.ed-nav-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.ed-nav-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+
+.ed-nav-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.ed-nav-role {
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.ed-nav-logout {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 9px;
+  padding: 0.42rem 0.9rem;
+  font-size: 0.84rem;
+  color: #64748b;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.12s;
+}
+.ed-nav-logout:hover { background: #f1f5f9; }
+
+/* ── Main content ── */
+.ed-main {
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* ── Page header ── */
+.ed-page-header {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  margin-bottom: 1.75rem;
+}
+
+.ed-hero-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.ed-page-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 0.25rem;
+}
+
+.ed-page-meta {
+  font-size: 0.88rem;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.ed-avail-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.ed-avail-dot.green  { background: #22c55e; }
+.ed-avail-dot.orange { background: #f97316; }
+
+/* ── Tabs ── */
+.ed-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0;
+}
+
+.ed-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: none;
+  border: none;
+  border-bottom: 2.5px solid transparent;
+  margin-bottom: -2px;
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #64748b;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.ed-tab:hover  { color: #4f8ef7; }
+.ed-tab.active {
+  color: #4f8ef7;
+  border-bottom-color: #4f8ef7;
+  font-weight: 600;
+}
+
+/* ── Card ── */
+.ed-card {
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 1.75rem;
+}
+
+/* ── Info grid (read-only) ── */
+.ed-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.ed-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.ed-info-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ed-info-value {
+  font-size: 0.92rem;
+  color: #1a202c;
+  font-weight: 500;
+}
+
+.ed-mono { font-family: 'Courier New', monospace; }
+
+/* ── Divider ── */
+.ed-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 1.25rem 0;
+}
+
+/* ── Form ── */
+.ed-form-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.9rem;
+}
+
+.ed-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.ed-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.ed-field label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.ed-field input,
+.ed-field select {
+  padding: 0.62rem 0.9rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 9px;
+  font-size: 0.92rem;
+  color: #1a202c;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.ed-field input:focus,
+.ed-field select:focus { border-color: #4f8ef7; }
+
+/* ── Message ── */
+.ed-msg {
+  font-size: 0.85rem;
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  margin-top: 0.5rem;
+}
+.ed-msg-ok  { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+.ed-msg-err { background: #fff5f5; color: #dc2626; border: 1px solid #fecaca; }
+
+/* ── Save button ── */
+.ed-form-actions { display: flex; justify-content: flex-end; margin-top: 1.25rem; }
+
+.ed-save-btn {
+  background: linear-gradient(135deg, #4f8ef7, #38d9a9);
+  border: none;
+  border-radius: 10px;
+  padding: 0.65rem 1.75rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.ed-save-btn:hover:not(:disabled) { opacity: 0.88; }
+.ed-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Skills section ── */
+.ed-skills-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.ed-skills-hint {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  margin: 0.25rem 0 0;
+}
+
+.ed-add-skill-btn {
+  background: #f1f5f9;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.42rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s;
+}
+.ed-add-skill-btn:hover { background: #e2e8f0; }
+
+/* ── Skill rows ── */
+.ed-skill-list { display: flex; flex-direction: column; gap: 0.6rem; }
+
+.ed-skill-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 1fr 32px;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.ed-skill-name,
+.ed-skill-score {
+  padding: 0.55rem 0.8rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #1a202c;
+  outline: none;
+  transition: border-color 0.15s;
+  background: #fff;
+}
+.ed-skill-name:focus,
+.ed-skill-score:focus { border-color: #4f8ef7; }
+
+.ed-skill-score-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.ed-skill-score { width: 100%; box-sizing: border-box; }
+.ed-score-label { font-size: 0.78rem; color: #94a3b8; white-space: nowrap; }
+
+/* Progress bar */
+.ed-skill-bar-wrap {
+  height: 6px;
+  background: #f1f5f9;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.ed-skill-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4f8ef7, #38d9a9);
+  border-radius: 99px;
+  transition: width 0.25s ease;
+  min-width: 4px;
+}
+
+.ed-remove-skill {
+  background: none;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  color: #ef4444;
+  font-size: 0.75rem;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  line-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.ed-remove-skill:hover:not(:disabled) { background: #fef2f2; }
+.ed-remove-skill:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Badge reuse from Employees.css ── */
+.em-badge       { display: inline-block; padding: 0.2rem 0.65rem; border-radius: 99px; font-size: 0.75rem; font-weight: 600; }
+.em-badge-hr    { background: #eff6ff; color: #3b82f6; }
+.em-badge-emp   { background: #f0fdf4; color: #16a34a; }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  .ed-info-grid  { grid-template-columns: 1fr; }
+  .ed-form-row   { grid-template-columns: 1fr; }
+  .ed-skill-row  { grid-template-columns: 1fr 70px 28px; }
+  .ed-skill-bar-wrap { display: none; }
+  .ed-nav-info   { display: none; }
+  .ed-main       { padding: 1.25rem 1rem 3rem; }
+}

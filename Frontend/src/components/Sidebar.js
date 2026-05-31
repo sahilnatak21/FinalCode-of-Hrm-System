@@ -35,6 +35,14 @@ const ICONS = {
       <polyline points="10 9 9 9 8 9" />
     </svg>
   ),
+  pool: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  ),
   team: (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 2a5 5 0 0 1 5 5c0 1.8-.96 3.37-2.38 4.24A9 9 0 0 1 21 19H3a9 9 0 0 1 6.38-7.76A5 5 0 0 1 7 7a5 5 0 0 1 5-5z" />
@@ -53,18 +61,27 @@ const ICONS = {
       <line x1="21" y1="12" x2="9" y2="12" />
     </svg>
   ),
+  createUser: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <line x1="19" y1="8" x2="19" y2="14" />
+      <line x1="16" y1="11" x2="22" y2="11" />
+    </svg>
+  ),
 };
 
 const menuItems = [
   { path: '/',                  icon: ICONS.dashboard,  label: 'Dashboard'        },
   { path: '/candidates',        icon: ICONS.candidates, label: 'Candidates'       },
   { path: '/candidate-import',  icon: ICONS.import,     label: 'Import CSV'       },
-  { path: '/resume-upload',     icon: ICONS.resume,     label: 'Resume Extraction'},
   { path: '/team',              icon: ICONS.team,       label: 'Team Formation'   },
   { path: '/results',           icon: ICONS.results,    label: 'Results'          },
+  { path: '/resume-upload',     icon: ICONS.resume,     label: 'Resume Extraction'},
+  { path: '/candidate-pool',    icon: ICONS.pool,       label: 'Candidate Pool'   },
 ];
 
-const Sidebar = ({ sidebarOpen, setSidebarOpen, currentPath, onLogout }) => {
+const Sidebar = ({ sidebarOpen, setSidebarOpen, currentPath, onLogout, authRole }) => {
   const handleLinkClick = () => {
     if (window.innerWidth <= 900) setSidebarOpen(false);
   };
@@ -125,6 +142,21 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen, currentPath, onLogout }) => {
 
         {/* Footer */}
         <div className="sidebar-footer">
+          {authRole === 'HR' && (
+            <>
+              <div className="sidebar-section-label">Admin</div>
+              <Link
+                to="/create-user"
+                className={`sidebar-link ${currentPath === '/create-user' ? 'active' : ''}`}
+                onClick={handleLinkClick}
+                style={{ marginBottom: '0.5rem' }}
+              >
+                <span className="sidebar-link-icon">{ICONS.createUser}</span>
+                <span className="sidebar-link-label">Create User</span>
+                {currentPath === '/create-user' && <span className="sidebar-active-dot" />}
+              </Link>
+            </>
+          )}
           <div className="sidebar-section-label">Account</div>
           <button className="sidebar-logout" onClick={onLogout}>
             <span className="sidebar-link-icon">{ICONS.logout}</span>

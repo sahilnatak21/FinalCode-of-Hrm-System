@@ -1,0 +1,26 @@
+Employee ID,Name,Department,Role,Skills,Skill Scores,Skill Level,Experience (years),Category,Availability,Performance Rating,Salary,Status
+EMP001,Rahul Sharma,Engineering,Senior Java Developer,"Java, Spring Boot, MySQL, REST API, Microservices","Java:9, Spring Boot:9, MySQL:8, REST API:8, Microservices:7",8,6,Full-time,Available,8.5,85000,Present
+EMP002,Priya Patel,Engineering,Python Backend Developer,"Python, Django, PostgreSQL, REST API, Redis","Python:9, Django:8, PostgreSQL:8, REST API:9, Redis:7",8,4,Full-time,Available,8.2,78000,Present
+EMP003,Amit Kumar,Engineering,Java Developer,"Java, Spring Boot, Kafka, Docker, MySQL","Java:8, Spring Boot:8, Kafka:7, Docker:7, MySQL:7",7,3,Full-time,Busy,7.5,65000,Present
+EMP004,Sara Johnson,Engineering,Node.js Developer,"Node.js, Express, MongoDB, JavaScript, GraphQL","Node.js:9, Express:8, MongoDB:8, JavaScript:9, GraphQL:7",8,5,Full-time,Available,8.8,82000,Present
+EMP005,Carlos Rivera,Engineering,Backend Developer,"Python, FastAPI, PostgreSQL, Redis, Docker","Python:8, FastAPI:8, PostgreSQL:7, Redis:8, Docker:7",7,3,Full-time,Available,7.8,67000,Present
+EMP006,Neha Singh,Engineering,Lead Software Architect,"Java, Spring Boot, MySQL, Architecture, Leadership","Java:9, Spring Boot:9, MySQL:9, Architecture:8, Leadership:7",9,9,Full-time,Available,9.2,110000,Present
+EMP007,Tom Walsh,Engineering,Backend Engineer,"Go, gRPC, Kubernetes, Docker, REST API","Go:8, gRPC:7, Kubernetes:7, Docker:8, REST API:8",7,5,Full-time,Available,8.0,80000,Present
+EMP008,Liang Chen,Engineering,Junior Java Developer,"Java, Spring Boot, MySQL","Java:7, Spring Boot:7, MySQL:6",6,1,Full-time,Busy,6.5,45000,Present
+EMP009,Emma Davis,Frontend,Senior React Developer,"React, JavaScript, TypeScript, CSS, HTML","React:9, JavaScript:9, TypeScript:8, CSS:8, HTML:9",9,4,Full-time,Available,8.6,80000,Present
+EMP010,Arjun Mehta,Frontend,Frontend Developer,"React, Angular, TypeScript, JavaScript, Vue","React:8, Angular:8, TypeScript:7, JavaScript:8, Vue:6",7,3,Full-time,Available,7.5,65000,Present
+EMP011,Sophie Martin,Frontend,Vue.js Developer,"Vue, JavaScript, CSS, React, UX Design","Vue:9, JavaScript:8, CSS:9, React:7, UX Design:7",8,5,Full-time,Available,8.9,83000,Present
+EMP012,James Liu,Frontend,Senior Frontend Engineer,"Next.js, React, TypeScript, GraphQL","Next.js:8, React:9, TypeScript:9, GraphQL:8",9,6,Full-time,Available,9.0,92000,Present
+EMP013,Fatima Al-Hassan,Frontend,Angular Developer,"Angular, TypeScript, RxJS, HTML, CSS","Angular:9, TypeScript:9, RxJS:8, HTML:9, CSS:8",8,7,Full-time,On Leave,8.7,85000,Present
+EMP014,Dr. Kavya Reddy,Data Science,Lead ML Engineer,"Machine Learning, Python, TensorFlow, NLP, Statistics","Machine Learning:9, Python:9, TensorFlow:8, NLP:8, Statistics:9",9,7,Full-time,Available,9.3,115000,Present
+EMP015,Michael Zhang,Data Science,Data Scientist,"Python, Data Science, PyTorch, Pandas, SQL","Python:9, Data Science:9, PyTorch:8, Pandas:9, SQL:8",9,5,Full-time,Available,8.8,95000,Present
+EMP016,Riya Gupta,Data Science,Junior Data Scientist,"Python, Machine Learning, Scikit-learn, Statistics, R","Python:8, Machine Learning:7, Scikit-learn:8, Statistics:8, R:7",7,2,Full-time,Available,7.2,58000,Present
+EMP017,Alex Novak,Data Science,Deep Learning Engineer,"Deep Learning, Python, TensorFlow, Computer Vision","Deep Learning:8, Python:9, TensorFlow:9, Computer Vision:8",8,4,Full-time,Available,8.5,90000,Present
+EMP018,Krishna Iyer,DevOps,Senior DevOps Engineer,"Docker, Kubernetes, AWS, CI/CD, Terraform","Docker:9, Kubernetes:9, AWS:8, CI/CD:9, Terraform:8",9,6,Full-time,Available,9.0,105000,Present
+EMP019,Maria Lopez,DevOps,Cloud Infrastructure Engineer,"AWS, Terraform, Docker, Jenkins, Linux","AWS:9, Terraform:9, Docker:8, Jenkins:8, Linux:9",9,8,Full-time,Available,9.1,108000,Present
+EMP020,Sam Okafor,DevOps,DevOps Engineer,"DevOps, Jenkins, Docker, Kubernetes, Linux","DevOps:8, Jenkins:8, Docker:7, Kubernetes:7, Linux:8",7,3,Full-time,Unavailable,7.6,68000,Present
+EMP021,Preeti Joshi,QA,Senior QA Engineer,"Testing, Selenium, JUnit, Automation, Java","Testing:9, Selenium:8, JUnit:8, Automation:9, Java:7",8,4,Full-time,Available,8.3,72000,Present
+EMP022,David Park,QA,QA Engineer,"Testing, Cypress, JavaScript, Postman, Automation","Testing:8, Cypress:9, JavaScript:7, Postman:8, Automation:8",8,3,Full-time,Available,7.8,63000,Present
+EMP023,Aditya Sharma,Management,Engineering Manager,"Leadership, Project Management, Scrum, Agile, Architecture","Leadership:9, Project Management:9, Scrum:9, Agile:9, Architecture:7",9,12,Full-time,Available,9.4,130000,Present
+EMP024,Jennifer Wu,Management,Delivery Manager,"Leadership, Management, Communication, Scrum, Planning","Leadership:8, Management:9, Communication:9, Scrum:8, Planning:8",8,10,Full-time,Available,9.1,120000,Present
+EMP025,Ryan Patel,Management,Scrum Master,"Scrum, Agile, Project Management, Leadership, React","Scrum:9, Agile:8, Project Management:8, Leadership:7, React:6",8,7,Full-time,Busy,8.5,95000,Present

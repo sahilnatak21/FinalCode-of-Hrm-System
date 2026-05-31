@@ -244,7 +244,8 @@ const TeamFormation = () => {
   const navigate = useNavigate();
   const [projectName, setProjectName] = useState('');
   const [projectId, setProjectId] = useState('');
-  const [totalTeamSize, setTotalTeamSize] = useState(5);
+  const [totalTeamSize,  setTotalTeamSize]  = useState(5);
+  const [numberOfTeams,  setNumberOfTeams]  = useState(1);
   const [projectStartDate, setProjectStartDate] = useState('');
   const [projectEndDate, setProjectEndDate] = useState('');
   const [requiredRole, setRequiredRole] = useState('');
@@ -394,17 +395,38 @@ const TeamFormation = () => {
       throw new Error('Upload a project CSV before generating the team.');
     }
 
-    const roleText = String(requiredRole || '').trim().toLowerCase();
-    const eligibleEmployees = roleText
-      ? employees.filter((employee) => {
-          const employeeRole = String(employee.role || '').toLowerCase();
-          const employeeDepartment = String(employee.department || '').toLowerCase();
-          return employeeRole.includes(roleText) || employeeDepartment.includes(roleText);
-        })
+    // Split "Devops,QA" → ["devops", "qa"] and match any keyword
+    const roleKeywords = String(requiredRole || '')
+      .toLowerCase()
+      .split(/[,|;]+/)
+      .map((r) => r.trim())
+      .filter(Boolean);
+
+    const empMatchesRole = (employee) => {
+      if (roleKeywords.length === 0) return true;
+      const haystack = [
+        String(employee.role || ''),
+        String(employee.department || ''),
+        String(employee.skills || ''),
+      ].join(' ').toLowerCase();
+      // Match full keyword OR any individual word of that keyword
+      return roleKeywords.some((kw) =>
+        haystack.includes(kw) || kw.split(' ').some((word) => word.length > 1 && haystack.includes(word))
+      );
+    };
+
+    let eligibleEmployees = roleKeywords.length > 0
+      ? employees.filter(empMatchesRole)
       : employees;
 
+    // Graceful fallback: if role filter is too strict, use all available employees
+    const roleFilterRelaxed = roleKeywords.length > 0 && eligibleEmployees.length < Math.max(2, totalTeamSize);
+    if (roleFilterRelaxed) {
+      eligibleEmployees = employees;
+    }
+
     if (eligibleEmployees.length === 0) {
-      throw new Error(`No employees match the requested role or department: ${requiredRole}`);
+      throw new Error('No employees available in the uploaded CSV.');
     }
 
     const maxExperience = Math.max(...eligibleEmployees.map((employee) => Number(employee.experience || 0)), 1);
@@ -666,7 +688,7 @@ const TeamFormation = () => {
           primarySkills: activeSkillRequirements.map((skill) => skill.name).join(','),
           secondarySkills: activeSkillRequirements.map((skill) => `${skill.name}:${skill.priority}`).join(','),
           requiredRole: requiredRole.trim(),
-          numberOfTeams: 1,
+          numberOfTeams: Number(numberOfTeams) || 1,
           requiredSkillRanges: activeSkillRequirements,
           scoreWeights: normalizedWeights,
           datasetSource: 'projectCsv',
@@ -778,8 +800,12 @@ const TeamFormation = () => {
               <strong>{activeSkillRequirements.length}</strong>
             </div>
             <div className="hero-stat">
-              <span>Target Team Size</span>
+              <span>Members / Team</span>
               <strong>{totalTeamSize}</strong>
+            </div>
+            <div className="hero-stat">
+              <span>Number of Teams</span>
+              <strong>{numberOfTeams}</strong>
             </div>
           </div>
         </section>
@@ -811,19 +837,41 @@ const TeamFormation = () => {
               </div>
             </div>
 
-            <label htmlFor="totalTeamSize">Total Team Size</label>
-            <div className="inline-field">
-              <input
-                id="totalTeamSize"
-                type="number"
-                min="1"
-                max="50"
-                value={totalTeamSize}
-                onChange={(e) => setTotalTeamSize(Number(e.target.value))}
-              />
-              <span>Members</span>
+            <div className="form-row">
+              <div>
+                <label htmlFor="totalTeamSize">Members per Team</label>
+                <div className="inline-field">
+                  <input
+                    id="totalTeamSize"
+                    type="number"
+                    min="1"
+                    max="50"
+                    value={totalTeamSize}
+                    onChange={(e) => setTotalTeamSize(Number(e.target.value))}
+                  />
+                  <span>members</span>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="numberOfTeams">Number of Teams</label>
+                <div className="inline-field">
+                  <input
+                    id="numberOfTeams"
+                    type="number"
+                    min="1"
+                    max="5"
+                    value={numberOfTeams}
+                    onChange={(e) => setNumberOfTeams(Math.max(1, Math.min(5, Number(e.target.value) || 1)))}
+                  />
+                  <span>team{numberOfTeams > 1 ? 's' : ''}</span>
+                </div>
+              </div>
             </div>
-            <p className="helper-text">Top-ranked employees will be selected into one project team.</p>
+            <p className="helper-text">
+              {numberOfTeams > 1
+                ? `${numberOfTeams} teams of ${totalTeamSize} members each will be formed and compared.`
+                : 'Top-ranked employees will be selected into one project team.'}
+            </p>
 
             <div className="form-row">
               <div>
@@ -849,11 +897,11 @@ const TeamFormation = () => {
             <input
               id="requiredRole"
               type="text"
-              placeholder="Optional filter: Backend, QA, Engineering"
+              placeholder="e.g. DevOps, QA or Backend, Frontend (comma-separated)"
               value={requiredRole}
               onChange={(e) => setRequiredRole(e.target.value)}
             />
-            <p className="helper-text">Use this to narrow the pool before score-based matching runs.</p>
+            <p className="helper-text">Separate multiple roles with commas. Leave blank to search all employees.</p>
 
             <label htmlFor="projectCsv">Project Employee CSV</label>
             <div className="project-csv-upload">

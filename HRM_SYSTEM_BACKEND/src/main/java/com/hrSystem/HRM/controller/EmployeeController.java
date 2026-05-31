@@ -41,6 +41,12 @@ public class EmployeeController {
         return ResponseEntity.ok(responseDTO);
     }
 
+    @GetMapping("/username/{username}")
+    public ResponseEntity<EmployeeResponseDTO> getEmployeeByUsername(@PathVariable String username) {
+        EmployeeResponseDTO responseDTO = employeeService.getEmployeeByUsername(username);
+        return ResponseEntity.ok(responseDTO);
+    }
+
     @GetMapping
     public ResponseEntity<List<EmployeeResponseDTO>> getAllEmployees() {
         List<EmployeeResponseDTO> employees = employeeService.getAllEmployees();

@@ -10,11 +10,14 @@ import TeamResults from './components/TeamResults';
 import Login from './components/Login';
 import CandidateImport from './components/CandidateImport';
 import ResumeUpload from './components/ResumeUpload';
+import CandidatePool from './components/CandidatePool';
+import CreateUser from './components/CreateUser';
+import EmployeeDashboard from './components/EmployeeDashboard';
 import './App.css';
 
 const AUTH_KEY = 'skillbase_auth_user';
 
-function AppContent({ isAuthenticated, onLogout, onLogin }) {
+function AppContent({ isAuthenticated, onLogout, onLogin, authRole, authData }) {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -22,9 +25,15 @@ function AppContent({ isAuthenticated, onLogout, onLogin }) {
     return (
       <Routes>
         <Route path="/login" element={<Login onLogin={onLogin} />} />
+        <Route path="/create-user" element={<CreateUser />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
+  }
+
+  // Employee role → dedicated employee portal
+  if (authRole === 'EMPLOYEE') {
+    return <EmployeeDashboard onLogout={onLogout} authData={authData} />;
   }
 
   return (
@@ -34,6 +43,7 @@ function AppContent({ isAuthenticated, onLogout, onLogin }) {
         setSidebarOpen={setSidebarOpen}
         currentPath={location.pathname}
         onLogout={onLogout}
+        authRole={authRole}
       />
       <div className={`main-content ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <button
@@ -54,9 +64,11 @@ function AppContent({ isAuthenticated, onLogout, onLogin }) {
             <Route path="/attendance" element={<Attendance />} />
             <Route path="/candidate-import" element={<CandidateImport />} />
             <Route path="/resume-upload" element={<ResumeUpload />} />
+            <Route path="/candidate-pool" element={<CandidatePool />} />
             <Route path="/team" element={<TeamFormation />} />
             <Route path="/results" element={<TeamResults />} />
             <Route path="/results/:projectKey" element={<TeamResults />} />
+            <Route path="/create-user" element={<CreateUser />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -70,6 +82,13 @@ function App() {
   const [authUser, setAuthUser] = useState(() => localStorage.getItem(AUTH_KEY) || '');
 
   const isAuthenticated = useMemo(() => Boolean(authUser), [authUser]);
+
+  const authData = useMemo(() => {
+    try { return JSON.parse(authUser) || {}; }
+    catch { return {}; }
+  }, [authUser]);
+
+  const authRole = authData.role || '';
 
   const handleLogin = (session) => {
     const authSession = JSON.stringify({
@@ -87,7 +106,7 @@ function App() {
 
   return (
     <Router>
-      <AppContent isAuthenticated={isAuthenticated} onLogout={handleLogout} onLogin={handleLogin} />
+      <AppContent isAuthenticated={isAuthenticated} onLogout={handleLogout} onLogin={handleLogin} authRole={authRole} authData={authData} />
     </Router>
   );
 }

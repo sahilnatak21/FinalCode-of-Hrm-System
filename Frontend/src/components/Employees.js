@@ -1,286 +1,392 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { createEmployee, getEmployees, updateEmployee } from '../utils/api';
-import { buildSkillVocabulary, vectorizeSkillScores } from '../utils/vectorization';
+import React, { useEffect, useState } from 'react';
+import { getEmployees, createEmployee, deleteEmployee } from '../utils/api';
 import { toast } from '../utils/toast';
+import './Employees.css';
 
-const createSkillEntry = (name = '', score = 5) => ({
-  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-  name,
-  score,
-});
+const DEPARTMENTS = ['Engineering', 'Marketing', 'Sales', 'HR', 'Finance', 'Operations', 'IT', 'Design', 'General'];
+const ROLES = ['EMPLOYEE', 'HR'];
 
-const CandidateManagement = () => {
-  const [candidates, setCandidates] = useState([]);
-  const [editingId, setEditingId] = useState('');
-  const [form, setForm] = useState({
-    employeeId: '',
-    name: '',
-    role: '',
-    department: 'General',
-    skills: '',
-    experience: '',
-    performanceRating: '',
-  });
-  const [skillEntries, setSkillEntries] = useState([createSkillEntry()]);
+const EMPTY_FORM = {
+  name: '',
+  username: '',
+  password: '',
+  role: 'EMPLOYEE',
+  department: 'Engineering',
+};
 
-  const loadCandidates = async () => {
+const getInitials = (name = '') =>
+  name.trim().split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+
+const AVATAR_COLORS = ['#4f8ef7', '#38d9a9', '#f97316', '#a855f7', '#ec4899', '#14b8a6', '#f59e0b'];
+const avatarColor = (name = '') => AVATAR_COLORS[name.charCodeAt(0) % AVATAR_COLORS.length];
+
+const EmployeeManagement = () => {
+  const [employees,  setEmployees]  = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [showModal,  setShowModal]  = useState(false);
+  const [viewEmp,    setViewEmp]    = useState(null);
+  const [form,       setForm]       = useState(EMPTY_FORM);
+  const [showPass,   setShowPass]   = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [formError,  setFormError]  = useState('');
+  const [search,     setSearch]     = useState('');
+
+  const load = async () => {
+    setLoading(true);
     try {
       const data = await getEmployees();
-      setCandidates(data);
-    } catch (error) {
-      console.error('Error loading candidates:', error);
-      setCandidates([]);
+      setEmployees(Array.isArray(data) ? data : []);
+    } catch {
+      setEmployees([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadCandidates();
-  }, []);
+  useEffect(() => { load(); }, []);
 
-  const skillVocabulary = useMemo(() => buildSkillVocabulary(candidates), [candidates]);
+  const openModal  = () => { setForm(EMPTY_FORM); setFormError(''); setShowPass(false); setShowModal(true); };
+  const closeModal = () => { setShowModal(false); setFormError(''); };
 
-  const currentSkillScores = useMemo(
-    () =>
-      skillEntries.reduce((acc, entry) => {
-        const name = String(entry.name || '').trim();
-        if (!name) return acc;
-        acc[name] = Number(entry.score || 0);
-        return acc;
-      }, {}),
-    [skillEntries]
-  );
-
-  const currentVector = useMemo(
-    () => vectorizeSkillScores(currentSkillScores, skillVocabulary),
-    [currentSkillScores, skillVocabulary]
-  );
-
-  const resetForm = () => {
-    setEditingId('');
-    setForm({
-      employeeId: '',
-      name: '',
-      role: '',
-      department: 'General',
-      skills: '',
-      experience: '',
-      performanceRating: '',
-    });
-    setSkillEntries([createSkillEntry()]);
-  };
-
-  const handleChange = (e) => {
-    setForm((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
-
-  const updateSkillEntry = (id, field, value) => {
-    setSkillEntries((prev) =>
-      prev.map((entry) =>
-        entry.id === id
-          ? { ...entry, [field]: field === 'score' ? Math.min(10, Math.max(0, Number(value) || 0)) : value }
-          : entry
-      )
-    );
-  };
-
-  const addSkillEntry = () => {
-    setSkillEntries((prev) => [...prev, createSkillEntry()]);
-  };
-
-  const removeSkillEntry = (id) => {
-    setSkillEntries((prev) => (prev.length > 1 ? prev.filter((entry) => entry.id !== id) : prev));
-  };
+  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.name || !form.role) {
-      toast.error('Please fill Name and Role');
-      return;
-    }
+    setFormError('');
 
-    if (Object.keys(currentSkillScores).length === 0) {
-      toast.error('Add at least one structured skill score');
-      return;
-    }
+    if (!form.name.trim())              { setFormError('Full name is required.');                     return; }
+    if (!form.username.trim())          { setFormError('Username is required.');                      return; }
+    if (form.username.trim().length < 3){ setFormError('Username must be at least 3 characters.');    return; }
+    if (!form.password)                 { setFormError('Password is required.');                      return; }
+    if (form.password.length < 6)      { setFormError('Password must be at least 6 characters.');    return; }
+    if (!form.department)               { setFormError('Please select a department.');                return; }
 
+    setSubmitting(true);
     try {
-      const payload = {
-        employeeId: form.employeeId || editingId || `CAND-${Date.now()}`,
-        name: form.name,
-        role: form.role,
-        department: form.department || 'General',
-        skills: form.skills || Object.keys(currentSkillScores).join(', '),
-        skillScores: currentSkillScores,
-        experience: Number(form.experience || 0),
-        performanceRating: Number(form.performanceRating || 0),
-        skillLevel:
-          Object.values(currentSkillScores).reduce((sum, score) => sum + Number(score || 0), 0) /
-            Math.max(1, Object.keys(currentSkillScores).length) || 1,
+      await createEmployee({
+        name:         form.name.trim(),
+        username:     form.username.trim(),
+        password:     form.password,
+        role:         form.role,
+        department:   form.department,
+        status:       'Present',
+        category:     'Full-time',
         availability: 'Available',
-        category: 'Full-time',
-        status: 'Present',
-      };
-
-      if (editingId) {
-        await updateEmployee(editingId, payload);
-        toast.success('Employee skill profile updated');
-      } else {
-        await createEmployee(payload);
-        toast.success('Candidate added');
-      }
-
-      resetForm();
-      await loadCandidates();
-    } catch (error) {
-      toast.error(`Failed to save candidate: ${error.message}`);
+      });
+      toast.success(`Employee "${form.name.trim()}" created successfully.`);
+      closeModal();
+      load();
+    } catch (err) {
+      setFormError(err.message || 'Failed to create employee.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
+  const handleDelete = async (emp) => {
+    if (!window.confirm(`Delete "${emp.name}"? This cannot be undone.`)) return;
+    try {
+      await deleteEmployee(emp.id);
+      toast.success(`"${emp.name}" deleted.`);
+      setEmployees((prev) => prev.filter((e) => e.id !== emp.id));
+    } catch (err) {
+      toast.error(err.message || 'Delete failed.');
+    }
+  };
+
+  const filtered = employees.filter((e) => {
+    const q = search.toLowerCase();
+    return (
+      (e.name       || '').toLowerCase().includes(q) ||
+      (e.username   || '').toLowerCase().includes(q) ||
+      (e.department || '').toLowerCase().includes(q) ||
+      (e.role       || '').toLowerCase().includes(q)
+    );
+  });
+
   return (
-    <>
-      <header className="header">
-        <h1>Candidate Management</h1>
-        <div className="user">Structured Skill Profiles</div>
-      </header>
+    <div className="em-page">
 
-      <section className="hero-strip">
-        <div className="hero-copy">
-          <span className="eyebrow">Module 2</span>
-          <h2>Capture skill data as key-value scores and convert it into vectors.</h2>
-          <p>
-            Employees can add or update their own skill scores, while the system builds a shared
-            vocabulary for vectorized matching against project requirements.
-          </p>
+      {/* Header */}
+      <div className="em-header">
+        <div>
+          <h1 className="em-title">Employee Management</h1>
+          <p className="em-subtitle">{employees.length} employee{employees.length !== 1 ? 's' : ''} registered</p>
         </div>
-        <div className="hero-stats">
-          <div className="hero-stat">
-            <span>Employees</span>
-            <strong>{candidates.length}</strong>
-          </div>
-          <div className="hero-stat">
-            <span>Vocabulary Size</span>
-            <strong>{skillVocabulary.length}</strong>
-          </div>
-          <div className="hero-stat">
-            <span>Vector Length</span>
-            <strong>{currentVector.length}</strong>
-          </div>
-        </div>
-      </section>
+        <button className="em-add-btn" onClick={openModal}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Add Employee
+        </button>
+      </div>
 
-      <form className="employee-form" onSubmit={handleSubmit}>
-        <h2>{editingId ? 'Update Employee Skill Profile' : 'Add Employee Skill Profile'}</h2>
-        <div className="form-row">
-          <div>
-            <label htmlFor="name">Name</label>
-            <input id="name" name="name" value={form.name} onChange={handleChange} placeholder="Candidate name" />
-          </div>
-          <div>
-            <label htmlFor="role">Role</label>
-            <input id="role" name="role" value={form.role} onChange={handleChange} placeholder="Backend Engineer" />
-          </div>
+      {/* Search */}
+      <div className="em-toolbar">
+        <div className="em-search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="16" height="16">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+          <input
+            className="em-search"
+            placeholder="Search by name, username, department, role…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
+      </div>
 
-        <div className="form-row">
-          <div>
-            <label htmlFor="department">Department</label>
-            <input
-              id="department"
-              name="department"
-              value={form.department}
-              onChange={handleChange}
-              placeholder="Engineering"
-            />
+      {/* Table */}
+      <div className="em-table-wrap">
+        {loading ? (
+          <div className="em-empty">Loading employees…</div>
+        ) : filtered.length === 0 ? (
+          <div className="em-empty">
+            {search
+              ? 'No employees match your search.'
+              : 'No employees yet. Click "Add Employee" to get started.'}
           </div>
-          <div>
-            <label htmlFor="skills">Skill Summary</label>
-            <input
-              id="skills"
-              name="skills"
-              value={form.skills}
-              onChange={handleChange}
-              placeholder="Java, Spring Boot, MySQL"
-            />
-          </div>
-        </div>
+        ) : (
+          <table className="em-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Employee</th>
+                <th>Username</th>
+                <th>Role</th>
+                <th>Department</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((emp, idx) => (
+                <tr key={emp.id} className="em-row-clickable" onClick={() => setViewEmp(emp)}>
+                  <td className="em-td-num">{idx + 1}</td>
+                  <td>
+                    <div className="em-name-cell">
+                      <div className="em-avatar" style={{ background: avatarColor(emp.name) }}>
+                        {getInitials(emp.name)}
+                      </div>
+                      <div>
+                        <div className="em-name">{emp.name}</div>
+                        <div className="em-empid">{emp.employeeId}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="em-username">
+                    {emp.username || <span className="em-na">—</span>}
+                  </td>
+                  <td>
+                    <span className={`em-badge ${emp.role === 'HR' ? 'em-badge-hr' : 'em-badge-emp'}`}>
+                      {emp.role}
+                    </span>
+                  </td>
+                  <td>{emp.department}</td>
+                  <td>
+                    <span className={`em-badge ${emp.status === 'Present' ? 'em-badge-present' : 'em-badge-absent'}`}>
+                      {emp.status || 'Present'}
+                    </span>
+                  </td>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <button className="em-del-btn" onClick={() => handleDelete(emp)} title="Delete employee">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" width="15" height="15">
+                        <polyline points="3 6 5 6 21 6" />
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                        <path d="M10 11v6M14 11v6" />
+                        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+                      </svg>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-        <div className="form-row">
-          <div>
-            <label htmlFor="experience">Experience</label>
-            <input
-              id="experience"
-              name="experience"
-              type="number"
-              min="0"
-              step="0.5"
-              value={form.experience}
-              onChange={handleChange}
-              placeholder="3"
-            />
-          </div>
-          <div>
-            <label htmlFor="performanceRating">Performance Rating</label>
-            <input
-              id="performanceRating"
-              name="performanceRating"
-              type="number"
-              min="0"
-              max="10"
-              step="0.1"
-              value={form.performanceRating}
-              onChange={handleChange}
-              placeholder="8.4"
-            />
-          </div>
-        </div>
+      {/* View Employee Modal */}
+      {viewEmp && (
+        <div className="em-overlay" onClick={(e) => e.target === e.currentTarget && setViewEmp(null)}>
+          <div className="em-modal em-view-modal">
 
-        <div className="section-title-row compact">
-          <div>
-            <label>Skill Scores</label>
-            <p className="helper-text">Store skills as key-value pairs so they can be vectorized later.</p>
-          </div>
-          <button type="button" className="btn btn-neutral" onClick={addSkillEntry}>
-            Add Skill
-          </button>
-        </div>
-
-        <div className="skill-entry-list">
-          {skillEntries.map((entry) => (
-            <div className="skill-entry-row" key={entry.id}>
-              <input
-                type="text"
-                value={entry.name}
-                onChange={(e) => updateSkillEntry(entry.id, 'name', e.target.value)}
-                placeholder="Skill name"
-              />
-              <input
-                type="number"
-                min="0"
-                max="10"
-                value={entry.score}
-                onChange={(e) => updateSkillEntry(entry.id, 'score', e.target.value)}
-                placeholder="Score"
-              />
-              <button type="button" className="btn btn-danger" onClick={() => removeSkillEntry(entry.id)}>
-                Remove
+            {/* Header */}
+            <div className="em-view-header">
+              <div className="em-view-avatar" style={{ background: avatarColor(viewEmp.name) }}>
+                {getInitials(viewEmp.name)}
+              </div>
+              <div className="em-view-hero">
+                <h2 className="em-view-name">{viewEmp.name}</h2>
+                <p className="em-view-meta">{viewEmp.employeeId} · {viewEmp.department}</p>
+              </div>
+              <button className="em-modal-close" onClick={() => setViewEmp(null)} type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
               </button>
             </div>
-          ))}
-        </div>
 
-        <div className="form-row">
-          <button type="submit">{editingId ? 'Update Candidate' : 'Add Candidate'}</button>
-          <button type="button" className="btn btn-neutral" onClick={resetForm}>
-            Clear Form
-          </button>
-        </div>
-      </form>
+            <div className="em-view-body">
 
-    </>
+              {/* Info grid */}
+              <div className="em-view-grid">
+                {[
+                  { label: 'Username',     value: viewEmp.username || '—', mono: true },
+                  { label: 'Role',         value: viewEmp.role,            badge: true },
+                  { label: 'Department',   value: viewEmp.department },
+                  { label: 'Status',       value: viewEmp.status || 'Present', statusBadge: true },
+                  { label: 'Availability', value: viewEmp.availability || '—' },
+                  { label: 'Category',     value: viewEmp.category || '—' },
+                ].map(({ label, value, mono, badge, statusBadge }) => (
+                  <div className="em-view-item" key={label}>
+                    <span className="em-view-label">{label}</span>
+                    {badge ? (
+                      <span className={`em-badge ${value === 'HR' ? 'em-badge-hr' : 'em-badge-emp'}`}>{value}</span>
+                    ) : statusBadge ? (
+                      <span className={`em-badge ${value === 'Present' ? 'em-badge-present' : 'em-badge-absent'}`}>{value}</span>
+                    ) : (
+                      <span className={`em-view-value ${mono ? 'em-mono' : ''}`}>{value}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <div className="em-view-divider" />
+
+              {/* Experience */}
+              <div className="em-view-section">
+                <div className="em-view-section-title">Experience</div>
+                <div className="em-view-exp-row">
+                  <div className="em-view-exp-circle">
+                    <span className="em-view-exp-num">{viewEmp.experience ?? 0}</span>
+                    <span className="em-view-exp-unit">yrs</span>
+                  </div>
+                  <div>
+                    <p className="em-view-exp-label">Years of experience</p>
+                    <p className="em-view-exp-sub">
+                      Skill level: <strong>{viewEmp.skillLevel ?? 1}</strong> / 10 &nbsp;·&nbsp;
+                      Performance: <strong>{viewEmp.performanceRating ?? 0}</strong> / 10
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Skills */}
+              {viewEmp.skills && (
+                <>
+                  <div className="em-view-divider" />
+                  <div className="em-view-section">
+                    <div className="em-view-section-title">Skills</div>
+                    <div className="em-view-skills">
+                      {viewEmp.skills.split(',').map((s) => s.trim()).filter(Boolean).map((skill) => (
+                        <span className="em-skill-tag" key={skill}>{skill}</span>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Employee Modal */}
+      {showModal && (
+        <div className="em-overlay" onClick={(e) => e.target === e.currentTarget && closeModal()}>
+          <div className="em-modal">
+
+            <div className="em-modal-header">
+              <div>
+                <h2 className="em-modal-title">Add Employee</h2>
+                <p className="em-modal-sub">Create an account the employee can log in with</p>
+              </div>
+              <button className="em-modal-close" onClick={closeModal} type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" width="18" height="18">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <form className="em-modal-form" onSubmit={handleSubmit} noValidate>
+
+              <div className="em-field">
+                <label htmlFor="em-name">Full Name</label>
+                <input
+                  id="em-name" name="name" type="text"
+                  value={form.name} onChange={handleChange}
+                  placeholder="e.g. John Doe"
+                  autoFocus
+                />
+              </div>
+
+              <div className="em-field">
+                <label htmlFor="em-username">Username</label>
+                <input
+                  id="em-username" name="username" type="text"
+                  value={form.username} onChange={handleChange}
+                  placeholder="e.g. john_doe"
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="em-field">
+                <label htmlFor="em-password">Password</label>
+                <div className="em-pass-wrap">
+                  <input
+                    id="em-password" name="password"
+                    type={showPass ? 'text' : 'password'}
+                    value={form.password} onChange={handleChange}
+                    placeholder="Min. 6 characters"
+                    autoComplete="new-password"
+                  />
+                  <button
+                    type="button"
+                    className="em-pass-toggle"
+                    onClick={() => setShowPass((v) => !v)}
+                    tabIndex={-1}
+                  >
+                    {showPass ? '🙈' : '👁️'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="em-form-row">
+                <div className="em-field">
+                  <label htmlFor="em-role">Role</label>
+                  <select id="em-role" name="role" value={form.role} onChange={handleChange}>
+                    {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+
+                <div className="em-field">
+                  <label htmlFor="em-dept">Department</label>
+                  <select id="em-dept" name="department" value={form.department} onChange={handleChange}>
+                    {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {formError && <div className="em-form-error">{formError}</div>}
+
+              <div className="em-modal-actions">
+                <button type="button" className="em-cancel-btn" onClick={closeModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="em-submit-btn" disabled={submitting}>
+                  {submitting ? 'Creating…' : 'Create Employee'}
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 
-export default CandidateManagement;
+export default EmployeeManagement;

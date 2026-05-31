@@ -1,0 +1,305 @@
+{
+  "projects": [
+
+    {
+      "_comment": "PROJECT 1 — E-Commerce Web Platform",
+      "endpoint": "POST http://localhost:5000/api/ml/team-formation",
+      "body": {
+        "criteria": {
+          "projectName": "E-Commerce Web Platform",
+          "projectId": "PROJ-001",
+          "teamName": "Web Dev Squad",
+          "projectPriority": "High",
+          "teamSize": 5,
+          "numberOfTeams": 1,
+          "minExperience": 2,
+          "requiredRole": "",
+          "projectBudget": 420000,
+          "projectStartDate": "2026-07-01",
+          "projectEndDate": "2026-12-31",
+          "requiredSkillRanges": [
+            {
+              "id": "req-1",
+              "name": "React",
+              "minScore": 7,
+              "maxScore": 10,
+              "priority": "critical"
+            },
+            {
+              "id": "req-2",
+              "name": "Spring Boot",
+              "minScore": 7,
+              "maxScore": 10,
+              "priority": "high"
+            },
+            {
+              "id": "req-3",
+              "name": "MySQL",
+              "minScore": 6,
+              "maxScore": 10,
+              "priority": "high"
+            },
+            {
+              "id": "req-4",
+              "name": "Docker",
+              "minScore": 6,
+              "maxScore": 10,
+              "priority": "medium"
+            },
+            {
+              "id": "req-5",
+              "name": "Testing",
+              "minScore": 5,
+              "maxScore": 10,
+              "priority": "low"
+            }
+          ],
+          "scoreWeights": {
+            "skill": 50,
+            "experience": 25,
+            "performance": 25
+          }
+        },
+        "config": {
+          "minClusters": 2,
+          "maxClusters": 6,
+          "randomState": 42,
+          "kmeansNInit": 20
+        }
+      },
+      "expected_team_hint": "Should include: Emma Davis or James Liu (React), Rahul Sharma or Neha Singh (Spring Boot + MySQL), Krishna Iyer (Docker), Preeti Joshi (Testing)",
+      "excluded_hint": "EMP013 (Fatima - On Leave) and EMP020 (Sam - Unavailable) must NOT appear"
+    },
+
+    {
+      "_comment": "PROJECT 2 — ML-Powered Recommendation Engine",
+      "endpoint": "POST http://localhost:5000/api/ml/team-formation",
+      "body": {
+        "criteria": {
+          "projectName": "ML Recommendation Engine",
+          "projectId": "PROJ-002",
+          "teamName": "AI Core Team",
+          "projectPriority": "Critical",
+          "teamSize": 4,
+          "numberOfTeams": 1,
+          "minExperience": 2,
+          "requiredRole": "data scientist, ml engineer",
+          "projectBudget": 380000,
+          "projectStartDate": "2026-08-01",
+          "projectEndDate": "2027-02-28",
+          "requiredSkillRanges": [
+            {
+              "id": "req-1",
+              "name": "Python",
+              "minScore": 8,
+              "maxScore": 10,
+              "priority": "critical"
+            },
+            {
+              "id": "req-2",
+              "name": "Machine Learning",
+              "minScore": 7,
+              "maxScore": 10,
+              "priority": "critical"
+            },
+            {
+              "id": "req-3",
+              "name": "TensorFlow",
+              "minScore": 6,
+              "maxScore": 10,
+              "priority": "high"
+            },
+            {
+              "id": "req-4",
+              "name": "PostgreSQL",
+              "minScore": 5,
+              "maxScore": 10,
+              "priority": "medium"
+            }
+          ],
+          "scoreWeights": {
+            "skill": 60,
+            "experience": 20,
+            "performance": 20
+          }
+        },
+        "config": {
+          "minClusters": 2,
+          "maxClusters": 5,
+          "randomState": 42,
+          "kmeansNInit": 20
+        }
+      },
+      "expected_team_hint": "Should include: Dr. Kavya Reddy (ML+Python+TF+NLP), Michael Zhang (Python+DS+PyTorch), Alex Novak (DL+TF+Python), Priya Patel or Carlos Rivera (PostgreSQL/backend support)",
+      "rf_pseudo_labels_note": "No real label column → RF uses pseudo-labels: Suitable(>=75), Maybe Suitable(>=50), Not Suitable(<50)"
+    },
+
+    {
+      "_comment": "PROJECT 3 — DevSecOps Pipeline Modernisation",
+      "endpoint": "POST http://localhost:5000/api/ml/team-formation",
+      "body": {
+        "criteria": {
+          "projectName": "DevSecOps Pipeline Modernisation",
+          "projectId": "PROJ-003",
+          "teamName": "Platform Engineering",
+          "projectPriority": "High",
+          "teamSize": 4,
+          "numberOfTeams": 1,
+          "minExperience": 3,
+          "requiredRole": "devops, cloud",
+          "projectBudget": 320000,
+          "projectStartDate": "2026-09-01",
+          "projectEndDate": "2027-03-31",
+          "requiredSkillRanges": [
+            {
+              "id": "req-1",
+              "name": "Docker",
+              "minScore": 7,
+              "maxScore": 10,
+              "priority": "critical"
+            },
+            {
+              "id": "req-2",
+              "name": "Kubernetes",
+              "minScore": 7,
+              "maxScore": 10,
+              "priority": "critical"
+            },
+            {
+              "id": "req-3",
+              "name": "AWS",
+              "minScore": 6,
+              "maxScore": 10,
+              "priority": "high"
+            },
+            {
+              "id": "req-4",
+              "name": "CI/CD",
+              "minScore": 6,
+              "maxScore": 10,
+              "priority": "high"
+            },
+            {
+              "id": "req-5",
+              "name": "Testing",
+              "minScore": 5,
+              "maxScore": 10,
+              "priority": "medium"
+            }
+          ],
+          "scoreWeights": {
+            "skill": 55,
+            "experience": 30,
+            "performance": 15
+          }
+        },
+        "config": {
+          "minClusters": 2,
+          "maxClusters": 5,
+          "randomState": 42,
+          "kmeansNInit": 20
+        }
+      },
+      "expected_team_hint": "Should include: Krishna Iyer (Docker+K8s+AWS+CI/CD), Maria Lopez (AWS+Terraform+Docker), Tom Walsh (Docker+K8s), Preeti Joshi or David Park (Testing)"
+    },
+
+    {
+      "_comment": "PROJECT 4 — Full-Stack SaaS Dashboard (2 Teams)",
+      "endpoint": "POST http://localhost:5000/api/ml/team-formation",
+      "body": {
+        "criteria": {
+          "projectName": "Full-Stack SaaS Dashboard",
+          "projectId": "PROJ-004",
+          "teamName": "SaaS Team",
+          "projectPriority": "Medium",
+          "teamSize": 4,
+          "numberOfTeams": 2,
+          "minExperience": 1,
+          "requiredRole": "",
+          "projectBudget": 600000,
+          "requiredSkillRanges": [
+            {
+              "id": "req-1",
+              "name": "React",
+              "minScore": 6,
+              "maxScore": 10,
+              "priority": "high"
+            },
+            {
+              "id": "req-2",
+              "name": "Python",
+              "minScore": 6,
+              "maxScore": 10,
+              "priority": "high"
+            },
+            {
+              "id": "req-3",
+              "name": "PostgreSQL",
+              "minScore": 5,
+              "maxScore": 10,
+              "priority": "medium"
+            },
+            {
+              "id": "req-4",
+              "name": "Docker",
+              "minScore": 5,
+              "maxScore": 10,
+              "priority": "medium"
+            }
+          ],
+          "scoreWeights": {
+            "skill": 45,
+            "experience": 30,
+            "performance": 25
+          }
+        },
+        "config": {
+          "minClusters": 2,
+          "maxClusters": 6,
+          "randomState": 42,
+          "kmeansNInit": 20
+        }
+      },
+      "expected_team_hint": "2 teams of 4 — balanced distribution of frontend + backend + data + devops"
+    }
+
+  ],
+
+  "how_to_test": {
+    "step1_import_csv": {
+      "description": "Import test_employees.csv through the app UI",
+      "path": "localhost:3000 → Import CSV (sidebar) → upload test_employees.csv",
+      "note": "OR copy it as employees.csv in Frontend/python/ to use as Python ML fallback"
+    },
+    "step2_use_ui": {
+      "description": "Use the Team Formation UI",
+      "path": "localhost:3000 → Team Formation → fill in project details from any project above → Generate"
+    },
+    "step3_direct_api": {
+      "description": "Call the Python ML API directly with curl",
+      "curl_example": "curl -X POST http://localhost:5000/api/ml/team-formation -H 'Content-Type: application/json' -d @project1_payload.json",
+      "powershell_example": "Invoke-RestMethod -Uri 'http://localhost:5000/api/ml/team-formation' -Method Post -ContentType 'application/json' -Body (Get-Content test_project_criteria.json | ConvertFrom-Json).projects[0].body | ConvertTo-Json -Depth 10"
+    },
+    "step4_verify_output": {
+      "check_kmeans": "Response → kmeans.selectedK, kmeans.silhouetteScore, kmeans.clusterSummary",
+      "check_rf": "Response → randomForestEvaluation.accuracyScore, precision, recall, f1Score, confusionMatrix, featureImportance",
+      "check_pseudo_labels": "Response → randomForestEvaluation.pseudoLabelUsed == true (when no real labels)",
+      "check_skill_gap": "Response → skillGapAnalysis.gaps[] with coverageStatus: Covered/Partially Covered/Missing",
+      "check_explanation": "Response → members[].explanation.reasonSelected, attentionContributions",
+      "check_leader": "Response → leader.leaderScore, leader.leaderReason",
+      "check_excluded": "Response → datasetSource.excludedEmployees — must contain Fatima Al-Hassan and Sam Okafor"
+    }
+  },
+
+  "expected_exclusions": [
+    {"name": "Fatima Al-Hassan", "reason": "On Leave"},
+    {"name": "Sam Okafor",       "reason": "Unavailable"}
+  ],
+
+  "expected_pseudo_label_distribution": {
+    "note": "With 25 employees (23 eligible after exclusions), pseudo-labels from finalCandidateScore:",
+    "Suitable":       "Dr. Kavya Reddy, Neha Singh, Aditya Sharma, Maria Lopez, Krishna Iyer, Jennifer Wu, James Liu (high scorers)",
+    "Maybe Suitable": "Emma Davis, Sara Johnson, Michael Zhang, Rahul Sharma, Sophie Martin, Alex Novak, Preeti Joshi",
+    "Not Suitable":   "Lower-scoring or junior employees with fewer required skills"
+  }
+}

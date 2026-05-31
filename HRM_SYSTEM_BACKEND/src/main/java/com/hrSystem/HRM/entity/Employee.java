@@ -21,6 +21,9 @@ public class Employee {
     @Column(name = "employee_id", unique = true, nullable = true)
     private String employeeId;
 
+    @Column(name = "username", unique = true, nullable = true)
+    private String username;
+
     @Column(name = "name", nullable = false)
     private String name;
 

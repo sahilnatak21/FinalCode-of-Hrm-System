@@ -9,6 +9,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -110,6 +111,66 @@ public class AuthService {
         return matches;
     }
 
-    public record AuthResult(Map<String, Object> body, HttpStatus status) {
+    public CreateUserResult createUser(String username, String password, String role) {
+        if (isBlank(username) || isBlank(password) || isBlank(role)) {
+            return new CreateUserResult(error("Username, password, and role are required."), HttpStatus.BAD_REQUEST);
+        }
+
+        String trimmedUsername = username.trim();
+        if (trimmedUsername.length() < 3) {
+            return new CreateUserResult(error("Username must be at least 3 characters."), HttpStatus.BAD_REQUEST);
+        }
+
+        String normalizedRole = role.trim().toUpperCase();
+        if (!normalizedRole.equals("HR") && !normalizedRole.equals("EMPLOYEE")) {
+            return new CreateUserResult(error("Role must be HR or EMPLOYEE."), HttpStatus.BAD_REQUEST);
+        }
+
+        if (userRepository.findByUsernameIgnoreCase(trimmedUsername).isPresent()) {
+            return new CreateUserResult(error("Username '" + trimmedUsername + "' is already taken."), HttpStatus.CONFLICT);
+        }
+
+        User user = new User();
+        user.setUsername(trimmedUsername);
+        user.setPassword(passwordEncoder.encode(password));
+        user.setRole(normalizedRole);
+        User saved = userRepository.save(user);
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", true);
+        body.put("message", "User created successfully.");
+        body.put("userId", saved.getId());
+        body.put("username", saved.getUsername());
+        body.put("role", saved.getRole());
+        return new CreateUserResult(body, HttpStatus.CREATED);
     }
+
+    public List<Map<String, Object>> getAllUsers() {
+        return userRepository.findAll().stream()
+                .map(u -> {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("id", u.getId());
+                    m.put("username", u.getUsername());
+                    m.put("role", u.getRole());
+                    return m;
+                })
+                .toList();
+    }
+
+    public void deleteUser(Long id) {
+        if (!userRepository.existsById(id)) {
+            throw new IllegalArgumentException("User with id " + id + " not found.");
+        }
+        userRepository.deleteById(id);
+    }
+
+    private Map<String, Object> error(String message) {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("success", false);
+        body.put("message", message);
+        return body;
+    }
+
+    public record AuthResult(Map<String, Object> body, HttpStatus status) {}
+    public record CreateUserResult(Map<String, Object> body, HttpStatus status) {}
 }

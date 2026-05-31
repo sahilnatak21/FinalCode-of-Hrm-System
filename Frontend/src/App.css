@@ -629,6 +629,51 @@ tbody tr:last-child td { border-bottom: none; }
 .backup-card strong { color: var(--text); font-size: 0.9375rem; }
 .backup-card span, .backup-card em { color: var(--text-muted); font-size: 0.8rem; font-style: normal; }
 
+/* ── Multi-team comparison bars ─────────────────────────────────────────── */
+.comparison-bars-section { margin-top: 8px; }
+.cmp-bar-group { margin-bottom: 20px; }
+.cmp-skill-group { margin-bottom: 18px; }
+.cmp-bar-label, .cmp-skill-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+}
+.cmp-bar-row {
+  display: grid;
+  grid-template-columns: 100px 1fr 60px;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+}
+.cmp-bar-name {
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cmp-bar-track {
+  height: 10px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.cmp-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.4s ease;
+  min-width: 4px;
+}
+.cmp-bar-val {
+  font-size: 0.8rem;
+  text-align: right;
+  color: var(--text);
+  white-space: nowrap;
+}
+
 /* ── CSV validation ───────────────────────────────────────────────────────── */
 .validation-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap: 8px; margin-top: 10px; }
 .validation-grid span { border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); padding: 8px 10px; color: var(--text-muted); font-size: 0.8125rem; display: block; }

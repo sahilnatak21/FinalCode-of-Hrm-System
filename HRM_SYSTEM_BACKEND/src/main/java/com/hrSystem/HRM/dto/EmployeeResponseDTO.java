@@ -13,6 +13,7 @@ public class EmployeeResponseDTO {
 
     private Long id;
     private String employeeId;
+    private String username;
     private String name;
     private String department;
     private String role;

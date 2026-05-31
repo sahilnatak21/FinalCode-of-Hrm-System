@@ -17,6 +17,9 @@ public class EmployeeRequestDTO {
     @JsonAlias({"Employee", "employee", "employee_id", "Employee ID", "candidateId", "candidate_id", "Candidate ID", "Candidate", "candidateCode", "candidate_code", "id"})
     private String employeeId;
 
+    private String username;
+    private String password;
+
     @JsonAlias({"Name", "name", "candidateName", "candidate_name", "Candidate Name", "fullName", "full_name", "candidateFullName", "candidate_full_name"})
     @NotBlank(message = "Name is required")
     @Size(min = 2, max = 100, message = "Name must be between 2 and 100 characters")
